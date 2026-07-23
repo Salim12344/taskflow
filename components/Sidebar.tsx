@@ -8,8 +8,9 @@ import { api } from "@/lib/api-client";
 import { groupIcon } from "@/lib/group-icon";
 
 type Group = { _id: string; name: string };
+type DmThread = { threadId: string; other: { id: string; name: string } | null; unread: number };
 
-function NavRow({ href, label, active, icon }: { href: string; label: string; active: boolean; icon?: React.ReactNode }) {
+function NavRow({ href, label, active, icon, trailing }: { href: string; label: string; active: boolean; icon?: React.ReactNode; trailing?: React.ReactNode }) {
   return (
     <Link href={href} style={{ textDecoration: "none", color: "inherit" }}>
       <div
@@ -27,7 +28,8 @@ function NavRow({ href, label, active, icon }: { href: string; label: string; ac
         }}
       >
         {icon}
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+        {trailing}
       </div>
     </Link>
   );
@@ -37,6 +39,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
   const pathname = usePathname();
   const { data: session } = useSession();
   const [groups, setGroups] = useState<Group[]>([]);
+  const [dms, setDms] = useState<DmThread[]>([]);
 
   function loadGroups() {
     api<{ groups: Group[] }>("/api/groups")
@@ -44,7 +47,14 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       .catch(() => setGroups([]));
   }
 
+  function loadDms() {
+    api<{ threads: DmThread[] }>("/api/dm")
+      .then((d) => setDms(d.threads))
+      .catch(() => setDms([]));
+  }
+
   useEffect(loadGroups, [pathname]);
+  useEffect(loadDms, [pathname]);
   useEffect(onNavigate, [pathname]);
 
   useEffect(() => {
@@ -123,6 +133,33 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
             No groups yet.
           </div>
         )}
+      </div>
+
+      <div style={{ padding: "16px 20px 6px", fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>
+        Direct messages
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 10px" }}>
+        {dms.length === 0 && (
+          <div style={{ fontSize: 11.5, padding: "4px 10px", color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>
+            Message a member from a group&rsquo;s Members list.
+          </div>
+        )}
+        {dms.slice(0, 3).map((d) => (
+          <NavRow
+            key={d.threadId}
+            href={`/messages/${d.threadId}`}
+            label={d.other?.name ?? "Unknown"}
+            active={pathname === `/messages/${d.threadId}`}
+            trailing={
+              d.unread > 0 ? (
+                <span style={{ background: "var(--color-accent)", color: "var(--color-bg)", fontSize: 10, fontWeight: 600, minWidth: 17, height: 17, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", flex: "none" }}>
+                  {d.unread}
+                </span>
+              ) : undefined
+            }
+          />
+        ))}
+        {dms.length > 3 && <NavRow href="/messages" label="See all messages" active={pathname === "/messages"} />}
       </div>
 
       <div style={{ flex: 1 }} />

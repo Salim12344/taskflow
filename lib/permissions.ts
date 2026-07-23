@@ -27,6 +27,15 @@ export async function isAssignableMember(groupId: string, userId: string) {
   return member?.role === "member";
 }
 
+/** DMs may only start between people who share at least one group (spec: no general "message anyone" search). */
+export async function shareAGroup(userIdA: string, userIdB: string) {
+  await connectDB();
+  const groupsA = await GroupMember.find({ userId: userIdA }, "groupId");
+  const groupsB = await GroupMember.find({ userId: userIdB }, "groupId");
+  const setB = new Set(groupsB.map((g) => g.groupId.toString()));
+  return groupsA.some((g) => setB.has(g.groupId.toString()));
+}
+
 export async function countAdmins(groupId: string) {
   await connectDB();
   return GroupMember.countDocuments({ groupId, role: "admin" });
