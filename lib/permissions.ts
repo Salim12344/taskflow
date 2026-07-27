@@ -33,8 +33,13 @@ export async function getCreatableOrg(userId: string) {
   return Organization.findOne({ groupCreators: userId });
 }
 
-export async function isGroupMember(groupId: string, userId: string) {
+/** Member either via groupMembers row, or as the (implicit-admin) owner of the group's org. */
+export async function isGroupMember(groupId: string, userId: string, orgId: string | null = null) {
   await connectDB();
+  if (orgId) {
+    const org = await Organization.findById(orgId);
+    if (org && org.ownerId.toString() === userId) return true;
+  }
   const member = await GroupMember.findOne({ groupId, userId });
   return !!member;
 }

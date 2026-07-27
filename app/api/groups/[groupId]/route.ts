@@ -15,7 +15,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ groupId
   const group = await Group.findOne({ _id: groupId, deletedAt: null });
   if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (!(await isGroupMember(groupId, session.user.id))) {
+  if (!(await isGroupMember(groupId, session.user.id, group.orgId?.toString() ?? null))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -59,7 +59,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ groupI
   if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Only the "dismiss onboarding" mutation is supported here; any member can dismiss.
-  if (body.dismissOnboarding && (await isGroupMember(groupId, session.user.id))) {
+  if (body.dismissOnboarding && (await isGroupMember(groupId, session.user.id, group.orgId?.toString() ?? null))) {
     group.onboardingDismissed = true;
     await group.save();
   }

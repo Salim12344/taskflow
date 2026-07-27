@@ -16,7 +16,7 @@ async function loadChatContext(taskId: string, userId: string) {
   const groupId = project.groupId.toString();
   const orgId = group.orgId?.toString() ?? null;
 
-  const isMember = await isGroupMember(groupId, userId);
+  const isMember = await isGroupMember(groupId, userId, orgId);
   if (!isMember) return null;
 
   const admin = await isGroupAdmin(groupId, userId, orgId);

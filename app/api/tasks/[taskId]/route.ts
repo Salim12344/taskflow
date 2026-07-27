@@ -24,7 +24,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ taskId:
   await connectDB();
   const ctx = await loadTaskContext(taskId);
   if (!ctx?.project) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!(await isGroupMember(ctx.project.groupId.toString(), session.user.id))) {
+  if (!(await isGroupMember(ctx.project.groupId.toString(), session.user.id, ctx.group?.orgId?.toString() ?? null))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

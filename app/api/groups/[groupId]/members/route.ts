@@ -14,7 +14,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ groupId
   await connectDB();
   const group = await Group.findOne({ _id: groupId, deletedAt: null });
   if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!(await isGroupMember(groupId, session.user.id))) {
+  if (!(await isGroupMember(groupId, session.user.id, group.orgId?.toString() ?? null))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
