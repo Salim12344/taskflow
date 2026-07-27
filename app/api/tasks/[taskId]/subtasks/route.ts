@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { connectDB } from "@/lib/db";
 import Project from "@/models/Project";
 import Task from "@/models/Task";
-import { isGroupAdmin, getActiveGroup } from "@/lib/permissions";
+import { getActiveGroup, canManageTask } from "@/lib/permissions";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ taskId: string }> }) {
   const session = await auth();
@@ -22,9 +22,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
   if (!project || !group) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const isAssignee = task.assignedTo?.toString() === session.user.id;
-  const admin = await isGroupAdmin(project.groupId.toString(), session.user.id, group.orgId?.toString() ?? null);
+  const isCreator = task.createdBy.toString() === session.user.id;
+  const isManager = canManageTask(task.reviewerId?.toString() ?? null, session.user.id, isCreator);
 
-  if (!isAssignee && !admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAssignee && !isManager) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   task.subtasks[index].done = !!done;
   await task.save();

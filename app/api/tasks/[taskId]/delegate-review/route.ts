@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { notify } from "@/lib/notify";
-import { isGroupAdmin, isOrgOwnerOfGroup, canManageTask } from "@/lib/permissions";
+import { isGroupAdmin, canManageTask } from "@/lib/permissions";
 import { loadTaskContext } from "@/lib/task-context";
 
 export async function POST(req: Request, { params }: { params: Promise<{ taskId: string }> }) {
@@ -22,8 +22,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
     return NextResponse.json({ error: "This task is already done" }, { status: 400 });
   }
   const isCreator = task.createdBy.toString() === session.user.id;
-  const isOrgOwner = await isOrgOwnerOfGroup(orgId, session.user.id);
-  const canManage = await canManageTask(task.reviewerId?.toString() ?? null, orgId, session.user.id, isCreator || isOrgOwner);
+  // Only this task's current manager (the creator, or the admin it's been delegated to) can
+  // hand it off — the org owner is never a bypass, their role over tasks is view-only.
+  const canManage = canManageTask(task.reviewerId?.toString() ?? null, session.user.id, isCreator);
   if (!canManage) {
     return NextResponse.json({ error: "Only this task's current manager can hand it off" }, { status: 403 });
   }
@@ -54,15 +55,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ task
   const { taskId } = await params;
   const ctx = await loadTaskContext(taskId);
   if (!ctx?.project) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const { task, project, group } = ctx;
+  const { task } = ctx;
 
   if (!task.pendingReviewDelegation) {
     return NextResponse.json({ error: "No pending delegation to cancel" }, { status: 404 });
   }
-  const orgId = group.orgId?.toString() ?? null;
   const isRequester = task.pendingReviewDelegation.fromUserId.toString() === session.user.id;
-  const isOrgOwner = await isOrgOwnerOfGroup(orgId, session.user.id);
-  if (!isRequester && !isOrgOwner) {
+  if (!isRequester) {
     return NextResponse.json({ error: "Only the admin who sent this hand-off can cancel it" }, { status: 403 });
   }
 

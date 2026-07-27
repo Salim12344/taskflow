@@ -90,19 +90,13 @@ export async function isOrgOwnerOfGroup(orgId: string | null, userId: string) {
 }
 
 /**
- * Once a task's management (reviewerId) is delegated, control fully moves to that admin —
- * other admins lose edit/reassign/delete/approve rights on it. The org owner keeps an
- * emergency override regardless, since they can never truly be locked out of their own org.
+ * Task management is exclusive to whoever assigned the task (or, once accepted, the admin
+ * it was delegated to) — nobody else, not even the org owner. The org owner's role over
+ * tasks is observation only (read access via isGroupAdmin), never a management override.
  */
-export async function canManageTask(
-  reviewerId: string | null,
-  orgId: string | null,
-  userId: string,
-  fallback: boolean
-) {
+export function canManageTask(reviewerId: string | null, userId: string, fallback: boolean) {
   if (!reviewerId) return fallback;
-  if (reviewerId === userId) return true;
-  return isOrgOwnerOfGroup(orgId, userId);
+  return reviewerId === userId;
 }
 
 export async function countAssignedTasks(groupId: string, userId: string, projectIds: string[]) {

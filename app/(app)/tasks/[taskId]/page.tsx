@@ -92,9 +92,10 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   const otherAdmins = members.filter((m) => m.role === "admin" && m.userId._id !== userId);
 
   // Default manager is whoever created/assigned the task, not "any admin" — that's the whole
-  // point of delegation existing. Once delegated, control fully moves to that admin.
+  // point of delegation existing. Once delegated, control fully moves to that admin. The org
+  // owner is never a bypass here — their role over tasks is view-only.
   const isDesignatedManager = !!task?.reviewerId && task.reviewerId === userId;
-  const canManage = task?.reviewerId ? isDesignatedManager || isOrgAccount : isCreator || isOrgAccount;
+  const canManage = task?.reviewerId ? isDesignatedManager : isCreator;
   const canDelete = canManage;
   const delegation = task?.pendingReviewDelegation ?? null;
   const isDelegationTarget = !!delegation && delegation.toUserId === userId;
@@ -220,7 +221,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                 ) : (
                   <div style={{ fontSize: 13.5 }}>
                     Hand-off pending — waiting on {nameFor(delegation.toUserId)} to accept.
-                    {(delegation.fromUserId === userId || isOrgAccount) && (
+                    {delegation.fromUserId === userId && (
                       <button className="btn btn-secondary" style={{ marginLeft: 8, padding: "2px 8px", fontSize: 12 }} onClick={cancelDelegate}>Cancel</button>
                     )}
                   </div>

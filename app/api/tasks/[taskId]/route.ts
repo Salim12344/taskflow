@@ -6,7 +6,7 @@ import TaskHistory from "@/models/TaskHistory";
 import TaskChatMessage from "@/models/TaskChatMessage";
 import GroupMember from "@/models/GroupMember";
 import { notify, notifyMany } from "@/lib/notify";
-import { isAssignableMember, isGroupAdmin, isGroupMember, isOrgOwnerOfGroup, canManageTask } from "@/lib/permissions";
+import { isAssignableMember, isGroupAdmin, isGroupMember, canManageTask } from "@/lib/permissions";
 import { nextDueDate } from "@/lib/recurrence";
 import { loadTaskContext } from "@/lib/task-context";
 
@@ -50,11 +50,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
   const isAssignee = task.assignedTo?.toString() === userId;
   const reviewerId = task.reviewerId?.toString() ?? null;
   const isCreator = task.createdBy.toString() === userId;
-  const isOrgOwner = await isOrgOwnerOfGroup(orgId, userId);
   // Default manager is the admin who created/assigned the task, not "any admin" — that's the
-  // whole point of delegation existing. Once delegated, control fully moves to that admin
-  // (plus the org owner as a permanent emergency fallback).
-  const canManage = await canManageTask(reviewerId, orgId, userId, isCreator || isOrgOwner);
+  // whole point of delegation existing. Once delegated, control fully moves to that admin.
+  // The org owner never gets a management override here — their role over tasks is
+  // observation only.
+  const canManage = canManageTask(reviewerId, userId, isCreator);
 
   if (!admin && !isAssignee) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -68,8 +68,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
     }
 
     if (task.status === "pending_review") {
-      // Only admins can approve/reject — and if this task's management has been delegated
-      // to a specific admin, only they (or the org owner, as a fallback) can act.
+      // Only admins can approve/reject — and only this task's manager (the creator, or the
+      // admin it's been delegated to) can act. The org owner is never a bypass here.
       if (!admin) return NextResponse.json({ error: "Only an admin can approve or reject" }, { status: 403 });
       if (!canManage) {
         return NextResponse.json({ error: "Only this task's manager can approve or reject it" }, { status: 403 });
@@ -178,14 +178,12 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ task
   await connectDB();
   const ctx = await loadTaskContext(taskId);
   if (!ctx?.project) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const { task, project, group } = ctx;
+  const { task } = ctx;
 
-  const orgId = group?.orgId?.toString() ?? null;
   const isCreator = task.createdBy.toString() === session.user.id;
-  const isOrgOwner = await isOrgOwnerOfGroup(orgId, session.user.id);
   // Default manager is the creator, not any admin — once delegated, deletion rights move
-  // with it too, except the org owner, who always keeps an emergency fallback.
-  const canManage = await canManageTask(task.reviewerId?.toString() ?? null, orgId, session.user.id, isCreator || isOrgOwner);
+  // with it too. The org owner never gets a bypass here; they can only view.
+  const canManage = canManageTask(task.reviewerId?.toString() ?? null, session.user.id, isCreator);
   if (!canManage) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
