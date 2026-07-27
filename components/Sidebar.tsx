@@ -6,9 +6,12 @@ import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import { groupIcon } from "@/lib/group-icon";
+import { Avatar } from "@/components/Avatar";
+import { isOnline } from "@/lib/presence";
 
 type Group = { _id: string; name: string };
-type DmThread = { threadId: string; other: { id: string; name: string } | null; unread: number };
+type DmThread = { threadId: string; other: { id: string; name: string; avatarUrl: string | null; lastActiveAt: string | null } | null; unread: number };
+type Me = { name: string; accountType: string; avatarUrl: string | null };
 
 function NavRow({ href, label, active, icon, trailing }: { href: string; label: string; active: boolean; icon?: React.ReactNode; trailing?: React.ReactNode }) {
   return (
@@ -40,6 +43,14 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
   const { data: session } = useSession();
   const [groups, setGroups] = useState<Group[]>([]);
   const [dms, setDms] = useState<DmThread[]>([]);
+  const [me, setMe] = useState<Me | null>(null);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  function loadNotifs() {
+    api<{ unreadCount: number }>("/api/notifications")
+      .then((d) => setUnreadNotifs(d.unreadCount))
+      .catch(() => {});
+  }
 
   function loadGroups() {
     api<{ groups: Group[] }>("/api/groups")
@@ -53,21 +64,34 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       .catch(() => setDms([]));
   }
 
+  function loadMe() {
+    api<{ user: Me }>("/api/me")
+      .then((d) => setMe(d.user))
+      .catch(() => {});
+  }
+
   useEffect(loadGroups, [pathname]);
   useEffect(loadDms, [pathname]);
+  useEffect(loadMe, []);
   useEffect(onNavigate, [pathname]);
 
   useEffect(() => {
-    window.addEventListener("taskflow:groups-changed", loadGroups);
-    return () => window.removeEventListener("taskflow:groups-changed", loadGroups);
-  }, []);
+    loadNotifs();
+    const interval = setInterval(loadNotifs, 20_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
-  const initials = (session?.user?.name ?? "?")
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  useEffect(() => {
+    window.addEventListener("taskflow:groups-changed", loadGroups);
+    window.addEventListener("taskflow:profile-changed", loadMe);
+    window.addEventListener("taskflow:notifications-changed", loadNotifs);
+    return () => {
+      window.removeEventListener("taskflow:groups-changed", loadGroups);
+      window.removeEventListener("taskflow:profile-changed", loadMe);
+      window.removeEventListener("taskflow:notifications-changed", loadNotifs);
+    };
+  }, []);
 
   return (
     <aside
@@ -89,15 +113,17 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       </div>
 
       {session?.user && (
-        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", margin: "0 10px 12px", background: "var(--color-bg)", borderRadius: 8 }}>
-          <div className="avatar" style={{ width: 26, height: 26, fontSize: 10 }}>{initials}</div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600 }}>{session.user.name}</div>
-            <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>
-              {session.user.accountType === "organization" ? "Organization" : "Individual"}
+        <Link href="/settings" style={{ textDecoration: "none", color: "inherit" }}>
+          <div className="nav-row" style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", margin: "0 10px 12px", background: "var(--color-bg)", borderRadius: 8 }}>
+            <Avatar name={me?.name ?? session.user.name ?? "?"} avatarUrl={me?.avatarUrl} size={26} />
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>{me?.name ?? session.user.name}</div>
+              <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>
+                {session.user.accountType === "organization" ? "Organization" : "Individual"}
+              </div>
             </div>
           </div>
-        </div>
+        </Link>
       )}
 
       <div style={{ padding: "2px 20px 6px", fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>
@@ -105,7 +131,22 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 10px" }}>
         <NavRow href="/dashboard" label="Dashboard" active={pathname === "/dashboard"} />
+        <NavRow
+          href="/notifications"
+          label="Notifications"
+          active={pathname === "/notifications"}
+          trailing={
+            unreadNotifs > 0 ? (
+              <span style={{ background: "var(--color-accent)", color: "var(--color-bg)", fontSize: 10, fontWeight: 600, minWidth: 17, height: 17, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", flex: "none" }}>
+                {unreadNotifs}
+              </span>
+            ) : undefined
+          }
+        />
         <NavRow href="/review-queue" label="Review queue" active={pathname === "/review-queue"} />
+        {session?.user?.accountType === "organization" && (
+          <NavRow href="/organization" label="Organization" active={pathname === "/organization"} />
+        )}
       </div>
 
       <div style={{ padding: "16px 20px 6px", fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>
@@ -150,6 +191,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
             href={`/messages/${d.threadId}`}
             label={d.other?.name ?? "Unknown"}
             active={pathname === `/messages/${d.threadId}`}
+            icon={<Avatar name={d.other?.name ?? "?"} avatarUrl={d.other?.avatarUrl} size={20} fontSize={9.5} online={isOnline(d.other?.lastActiveAt ?? null)} />}
             trailing={
               d.unread > 0 ? (
                 <span style={{ background: "var(--color-accent)", color: "var(--color-bg)", fontSize: 10, fontWeight: 600, minWidth: 17, height: 17, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", flex: "none" }}>
@@ -163,7 +205,10 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       </div>
 
       <div style={{ flex: 1 }} />
-      <div style={{ padding: "12px 16px 16px", borderTop: "1px solid var(--color-divider)" }}>
+      <div style={{ padding: "0 10px 8px" }}>
+        <NavRow href="/settings" label="Settings" active={pathname === "/settings"} />
+      </div>
+      <div style={{ padding: "0 16px 16px" }}>
         <button className="btn btn-secondary btn-block" onClick={() => signOut({ callbackUrl: "/login" })}>
           Log out
         </button>

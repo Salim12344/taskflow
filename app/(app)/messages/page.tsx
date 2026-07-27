@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { api } from "@/lib/api-client";
+import { Avatar } from "@/components/Avatar";
+import { isOnline, formatLastSeen } from "@/lib/presence";
 
 type Thread = {
   threadId: string;
-  other: { id: string; name: string } | null;
+  other: { id: string; name: string; avatarUrl: string | null; lastActiveAt: string | null } | null;
   lastMessageAt: string;
   lastMessage: { text: string; senderId: string; createdAt: string } | null;
   unread: number;
@@ -33,7 +35,6 @@ export default function MessagesInboxPage() {
       <div style={{ borderRadius: 8, overflow: "hidden", background: "var(--color-surface)" }}>
         {threads?.map((t) => {
           const mine = t.lastMessage?.senderId === session?.user?.id;
-          const initials = (t.other?.name ?? "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
           return (
             <div
               key={t.threadId}
@@ -41,7 +42,7 @@ export default function MessagesInboxPage() {
               onClick={() => router.push(`/messages/${t.threadId}?from=inbox`)}
               style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", borderBottom: "1px solid var(--color-divider)" }}
             >
-              <div className="avatar" style={{ width: 42, height: 42, fontSize: 13 }}>{initials}</div>
+              <Avatar name={t.other?.name ?? "?"} avatarUrl={t.other?.avatarUrl} size={42} fontSize={13} online={isOnline(t.other?.lastActiveAt ?? null)} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14.5, fontWeight: t.unread > 0 ? 600 : 400 }}>{t.other?.name ?? "Unknown"}</div>
                 <div style={{ fontSize: 13, color: t.unread > 0 ? "var(--color-text)" : "color-mix(in srgb, var(--color-text) 55%, transparent)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>

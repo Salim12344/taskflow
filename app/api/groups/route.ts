@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { connectDB } from "@/lib/db";
 import Group from "@/models/Group";
 import GroupMember from "@/models/GroupMember";
+import { getCreatableOrg } from "@/lib/permissions";
 
 export async function GET() {
   const session = await auth();
@@ -20,13 +21,20 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { name, orgId } = await request.json();
+  const { name } = await request.json();
   if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
 
   await connectDB();
+
+  // Only the org's owner or a granted "group creator" may create groups — always under that org, never client-specified.
+  const org = await getCreatableOrg(session.user.id);
+  if (!org) {
+    return NextResponse.json({ error: "You don't have permission to create a group. Ask your organization's admin." }, { status: 403 });
+  }
+
   const group = await Group.create({
     name,
-    orgId: orgId ?? null,
+    orgId: org._id,
     createdBy: session.user.id,
   });
   await GroupMember.create({

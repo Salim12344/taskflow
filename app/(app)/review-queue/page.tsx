@@ -22,7 +22,7 @@ export default function ReviewQueuePage() {
   }, []);
 
   return (
-    <div className="tf-fade page-pad" style={{ padding: "32px 40px 40px", maxWidth: 900 }}>
+    <div className="tf-fade page-pad" style={{ padding: "32px 40px 40px", maxWidth: 1200 }}>
       <h2 style={{ marginBottom: 20 }}>Review queue</h2>
       {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13 }}>{error}</div>}
       {sections?.length === 0 && <div className="card-meta">Nothing waiting on review.</div>}

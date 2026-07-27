@@ -6,6 +6,7 @@ import DMThread from "@/models/DMThread";
 import DMMessage from "@/models/DMMessage";
 import User from "@/models/User";
 import { shareAGroup } from "@/lib/permissions";
+import { maskPresence } from "@/lib/presence";
 
 export async function GET() {
   const session = await auth();
@@ -17,12 +18,12 @@ export async function GET() {
   const enriched = await Promise.all(
     threads.map(async (t) => {
       const otherId = t.participantIds.find((p: Types.ObjectId) => p.toString() !== session.user.id);
-      const other = otherId ? await User.findById(otherId, "name email") : null;
+      const other = otherId ? await User.findById(otherId, "name email avatarUrl lastActiveAt showOnlineStatus") : null;
       const lastMessage = await DMMessage.findOne({ threadId: t._id }).sort({ createdAt: -1 });
       const unread = await DMMessage.countDocuments({ threadId: t._id, senderId: otherId, readAt: null });
       return {
         threadId: t._id,
-        other: other ? { id: other._id, name: other.name } : null,
+        other: other ? { id: other._id, name: other.name, avatarUrl: other.avatarUrl, lastActiveAt: maskPresence(other) } : null,
         lastMessageAt: t.lastMessageAt,
         lastMessage: lastMessage ? { text: lastMessage.text, senderId: lastMessage.senderId, createdAt: lastMessage.createdAt } : null,
         unread,

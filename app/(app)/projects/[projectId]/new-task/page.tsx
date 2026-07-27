@@ -55,7 +55,7 @@ export default function NewTaskPage({ params }: { params: Promise<{ projectId: s
       </div>
       <h2 style={{ marginBottom: 18 }}>New task</h2>
       <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
-        <form onSubmit={onSubmit} className="card elev-sm" style={{ width: "100%", maxWidth: 640, height: "fit-content" }}>
+        <form onSubmit={onSubmit} className="card elev-sm" style={{ width: "100%", maxWidth: 820, height: "fit-content" }}>
           <div className="field"><label>Title</label><input className="input" required value={title} onChange={(e) => setTitle(e.target.value)} /></div>
           <div className="field"><label>Description</label><textarea className="input" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
           <div className="form-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

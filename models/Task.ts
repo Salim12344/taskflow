@@ -20,6 +20,17 @@ const TaskSchema = new Schema({
   ],
   deadline: { type: Date, default: null },
   submittedAt: { type: Date, default: null }, // set when status -> pending_review, used to sort the review queue oldest-first
+  // Once accepted, only this admin may approve/reject — null means any group admin can (default, unchanged behavior).
+  reviewerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  // An outstanding request to hand off review responsibility; nothing transfers until the target admin accepts.
+  pendingReviewDelegation: {
+    type: {
+      toUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+      fromUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+      createdAt: { type: Date, default: Date.now },
+    },
+    default: null,
+  },
   recurrence: { type: String, enum: ["none", "daily", "weekly", "monthly"], default: "none" },
   subtasks: [
     {

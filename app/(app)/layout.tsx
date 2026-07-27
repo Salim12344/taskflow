@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { api } from "@/lib/api-client";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
@@ -13,6 +14,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
   }, [status, router]);
+
+  // Presence heartbeat — any open authenticated tab pings every 30s so others can see you're online.
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const ping = () => api("/api/me/heartbeat", { method: "POST" }).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 30_000);
+    return () => clearInterval(interval);
+  }, [status]);
 
   if (status !== "authenticated") {
     return (

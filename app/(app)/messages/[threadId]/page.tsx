@@ -4,9 +4,11 @@ import { useEffect, useRef, useState, use as usePromise } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { api } from "@/lib/api-client";
+import { Avatar } from "@/components/Avatar";
+import { isOnline, formatLastSeen } from "@/lib/presence";
 
 type Message = { _id: string; text: string; senderId: string; createdAt: string; readAt: string | null };
-type Thread = { threadId: string; other: { id: string; name: string } | null };
+type Thread = { threadId: string; other: { id: string; name: string; avatarUrl: string | null; lastActiveAt: string | null } | null };
 
 export default function DmThreadPage({ params }: { params: Promise<{ threadId: string }> }) {
   const { threadId } = usePromise(params);
@@ -16,22 +18,44 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherName, setOtherName] = useState<string | null>(null);
+  const [otherAvatar, setOtherAvatar] = useState<string | null>(null);
+  const [otherLastActive, setOtherLastActive] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
+  const [otherTyping, setOtherTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const lastTypingPingRef = useRef(0);
 
   function loadMessages() {
-    api<{ messages: Message[] }>(`/api/dm/${threadId}/messages`)
-      .then((d) => setMessages(d.messages))
+    api<{ messages: Message[]; otherTyping: boolean }>(`/api/dm/${threadId}/messages`)
+      .then((d) => { setMessages(d.messages); setOtherTyping(d.otherTyping); })
       .catch((e) => setError(e.message));
+  }
+
+  function onComposerChange(value: string) {
+    setComposer(value);
+    const now = Date.now();
+    if (now - lastTypingPingRef.current > 2500) {
+      lastTypingPingRef.current = now;
+      api(`/api/dm/${threadId}/typing`, { method: "POST" }).catch(() => {});
+    }
+  }
+
+  function loadOther() {
+    api<{ threads: Thread[] }>("/api/dm")
+      .then((d) => {
+        const other = d.threads.find((t) => t.threadId === threadId)?.other;
+        setOtherName(other?.name ?? null);
+        setOtherAvatar(other?.avatarUrl ?? null);
+        setOtherLastActive(other?.lastActiveAt ?? null);
+      })
+      .catch(() => {});
   }
 
   useEffect(() => {
     loadMessages();
-    api<{ threads: Thread[] }>("/api/dm")
-      .then((d) => setOtherName(d.threads.find((t) => t.threadId === threadId)?.other?.name ?? null))
-      .catch(() => {});
-    const interval = setInterval(loadMessages, 4000);
+    loadOther();
+    const interval = setInterval(() => { loadMessages(); loadOther(); }, 4000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
@@ -57,18 +81,18 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
   const backTarget = from?.startsWith("group:") ? `/groups/${from.split(":")[1]}` : "/messages";
   const backLabel = from?.startsWith("group:") ? "Back to group" : "Messages";
 
-  const initials = (otherName ?? "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-
   return (
     <div className="tf-fade page-pad" style={{ display: "flex", flexDirection: "column", height: "100%", padding: "24px 40px", minHeight: 0 }}>
       <div onClick={() => router.push(backTarget)} className="back-link" style={{ marginBottom: 14, width: "fit-content" }}>
         ← {backLabel}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-        <div className="avatar" style={{ width: 32, height: 32, fontSize: 12 }}>{initials}</div>
+        <Avatar name={otherName ?? "?"} avatarUrl={otherAvatar} size={32} fontSize={12} online={isOnline(otherLastActive)} />
         <div>
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 15 }}>{otherName ?? "…"}</div>
-          <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>Private conversation</div>
+          <div style={{ fontSize: 11.5, color: isOnline(otherLastActive) ? "var(--color-green)" : "color-mix(in srgb, var(--color-text) 50%, transparent)", fontStyle: otherTyping ? "italic" : "normal" }}>
+            {otherTyping ? "typing…" : formatLastSeen(otherLastActive)}
+          </div>
         </div>
       </div>
       {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
@@ -88,7 +112,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
               </div>
               {isLastMine && (
                 <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--color-text) 45%, transparent)", marginTop: 2, padding: "0 2px" }}>
-                  {m.readAt ? "Seen" : "Delivered"}
+                  {m.readAt ? `Seen ${new Date(m.readAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Delivered"}
                 </div>
               )}
             </div>
@@ -97,7 +121,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
         <div ref={endRef} />
       </div>
       <form onSubmit={sendMessage} style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <input className="input" placeholder={`Message ${otherName ?? ""}…`} value={composer} onChange={(e) => setComposer(e.target.value)} style={{ flex: 1 }} />
+        <input className="input" placeholder={`Message ${otherName ?? ""}…`} value={composer} onChange={(e) => onComposerChange(e.target.value)} style={{ flex: 1 }} />
         <button className="btn btn-primary btn-icon" type="submit">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
         </button>

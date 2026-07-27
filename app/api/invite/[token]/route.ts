@@ -5,7 +5,7 @@ import InviteLink from "@/models/InviteLink";
 import Group from "@/models/Group";
 import GroupMember from "@/models/GroupMember";
 import GroupMessage from "@/models/GroupMessage";
-import Notification from "@/models/Notification";
+import { notifyMany } from "@/lib/notify";
 
 async function validateInvite(token: string) {
   const invite = await InviteLink.findOne({ token });
@@ -68,12 +68,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
   });
 
   const admins = await GroupMember.find({ groupId: group._id, role: "admin" });
-  await Notification.insertMany(
-    admins.map((a) => ({
-      userId: a.userId,
-      type: "member_joined",
-      payload: { groupId: group._id, userId: session.user.id },
-    }))
+  await notifyMany(
+    admins.map((a) => a.userId.toString()),
+    "member_joined",
+    `${session.user.name} joined ${group.name}`,
+    { payload: { groupId: group._id, userId: session.user.id } }
   );
 
   return NextResponse.json({ alreadyMember: false, group: { id: group._id, name: group.name } });

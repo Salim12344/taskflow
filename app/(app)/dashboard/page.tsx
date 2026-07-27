@@ -9,6 +9,7 @@ type Group = { _id: string; name: string; orgId: string | null };
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [canCreateGroups, setCanCreateGroups] = useState(false);
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -19,6 +20,9 @@ export default function DashboardPage() {
     api<{ groups: Group[] }>("/api/groups")
       .then((d) => setGroups(d.groups))
       .catch((e) => setError(e.message));
+    api<{ canCreateGroups: boolean }>("/api/me")
+      .then((d) => setCanCreateGroups(d.canCreateGroups))
+      .catch(() => {});
   }
 
   useEffect(load, []);
@@ -46,13 +50,13 @@ export default function DashboardPage() {
     <div className="tf-fade page-pad" style={{ padding: "32px 40px 40px", maxWidth: 1100 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
         <h2>Your groups</h2>
-        <button className="btn btn-primary" onClick={() => setShowNew((s) => !s)}>New group</button>
+        {canCreateGroups && <button className="btn btn-primary" onClick={() => setShowNew((s) => !s)}>New group</button>}
       </div>
       <div style={{ fontSize: 13, color: "color-mix(in srgb, var(--color-text) 55%, transparent)", marginBottom: 22 }}>
         Groups you belong to across your account.
       </div>
 
-      {showNew && (
+      {showNew && canCreateGroups && (
         <form onSubmit={createGroup} className="card elev-sm" style={{ maxWidth: 400, marginBottom: 24, flexDirection: "row", gap: 8 }}>
           <input className="input" placeholder="Group name" required value={name} onChange={(e) => setName(e.target.value)} />
           <button className="btn btn-primary" disabled={creating} type="submit">Create</button>
@@ -62,7 +66,11 @@ export default function DashboardPage() {
       {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
 
       {groups === null && !error && <div className="card-meta">Loading…</div>}
-      {groups?.length === 0 && <div className="card-meta">No groups yet — create one to get started.</div>}
+      {groups?.length === 0 && (
+        <div className="card-meta">
+          {canCreateGroups ? "No groups yet — create one to get started." : "No groups yet — ask an organization admin to invite you."}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 16 }}>
         {groups?.map((g) => {

@@ -5,7 +5,7 @@ import Group from "@/models/Group";
 import GroupMember from "@/models/GroupMember";
 import Project from "@/models/Project";
 import Task from "@/models/Task";
-import { countAdmins, countPendingReviewTasks } from "@/lib/permissions";
+import { hasAnotherAdmin, countPendingReviewTasks, isOrgOwnerOfGroup } from "@/lib/permissions";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ groupId: string }> }) {
   const session = await auth();
@@ -15,11 +15,16 @@ export async function POST(_req: Request, { params }: { params: Promise<{ groupI
   await connectDB();
   const group = await Group.findOne({ _id: groupId, deletedAt: null });
   if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const orgId = group.orgId?.toString() ?? null;
 
   const membership = await GroupMember.findOne({ groupId, userId: session.user.id });
   if (!membership) return NextResponse.json({ error: "Not a member" }, { status: 404 });
 
-  if (membership.role === "admin" && (await countAdmins(groupId)) <= 1) {
+  if (await isOrgOwnerOfGroup(orgId, session.user.id)) {
+    return NextResponse.json({ error: "The organization owner can't leave a group they own" }, { status: 400 });
+  }
+
+  if (membership.role === "admin" && !(await hasAnotherAdmin(groupId, orgId, session.user.id))) {
     return NextResponse.json(
       { error: "Promote another member to admin before leaving/stepping down" },
       { status: 409 }

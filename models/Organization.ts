@@ -9,6 +9,8 @@ const OrganizationSchema = new Schema({
     match: /^\d{6}$/,
   },
   ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  // Individuals granted "head of department" style permission to create groups under this org.
+  groupCreators: [{ type: Schema.Types.ObjectId, ref: "User" }],
   createdAt: { type: Date, default: Date.now },
 });
 

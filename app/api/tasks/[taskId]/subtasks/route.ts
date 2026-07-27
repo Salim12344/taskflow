@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { connectDB } from "@/lib/db";
-import Group from "@/models/Group";
 import Project from "@/models/Project";
 import Task from "@/models/Task";
-import { isGroupAdmin } from "@/lib/permissions";
+import { isGroupAdmin, getActiveGroup } from "@/lib/permissions";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ taskId: string }> }) {
   const session = await auth();
@@ -19,11 +18,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
   if (!task.subtasks[index]) return NextResponse.json({ error: "Invalid subtask index" }, { status: 400 });
 
   const project = await Project.findById(task.projectId);
-  const group = project ? await Group.findById(project.groupId) : null;
+  const group = project ? await getActiveGroup(project.groupId.toString()) : null;
+  if (!project || !group) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
   const isAssignee = task.assignedTo?.toString() === session.user.id;
-  const admin = project
-    ? await isGroupAdmin(project.groupId.toString(), session.user.id, group?.orgId?.toString() ?? null)
-    : false;
+  const admin = await isGroupAdmin(project.groupId.toString(), session.user.id, group.orgId?.toString() ?? null);
 
   if (!isAssignee && !admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 

@@ -1,23 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { connectDB } from "@/lib/db";
-import Group from "@/models/Group";
-import Project from "@/models/Project";
 import Task from "@/models/Task";
 import TaskHistory from "@/models/TaskHistory";
 import TaskChatMessage from "@/models/TaskChatMessage";
 import GroupMember from "@/models/GroupMember";
-import Notification from "@/models/Notification";
-import { isAssignableMember, isGroupAdmin, isGroupMember } from "@/lib/permissions";
+import { notify, notifyMany } from "@/lib/notify";
+import { isAssignableMember, isGroupAdmin, isGroupMember, canManageTask } from "@/lib/permissions";
 import { nextDueDate } from "@/lib/recurrence";
-
-async function loadTaskContext(taskId: string) {
-  const task = await Task.findOne({ _id: taskId, deletedAt: null });
-  if (!task) return null;
-  const project = await Project.findById(task.projectId);
-  const group = project ? await Group.findById(project.groupId) : null;
-  return { task, project, group };
-}
+import { loadTaskContext } from "@/lib/task-context";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   todo: ["in_progress"],
@@ -54,8 +45,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
   const groupId = project.groupId.toString();
   const userId = session.user.id;
 
-  const admin = await isGroupAdmin(groupId, userId, group?.orgId?.toString() ?? null);
+  const orgId = group?.orgId?.toString() ?? null;
+  const admin = await isGroupAdmin(groupId, userId, orgId);
   const isAssignee = task.assignedTo?.toString() === userId;
+  const reviewerId = task.reviewerId?.toString() ?? null;
+  // Once management is delegated, it fully moves to that admin (plus the org owner as an
+  // emergency fallback) — other admins lose edit/reassign/delete/approve rights on this task.
+  const canManage = await canManageTask(reviewerId, orgId, userId, admin);
 
   if (!admin && !isAssignee) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -69,8 +65,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
     }
 
     if (task.status === "pending_review") {
-      // Only admins can approve/reject.
+      // Only admins can approve/reject — and if this task's management has been delegated
+      // to a specific admin, only they (or the org owner, as a fallback) can act.
       if (!admin) return NextResponse.json({ error: "Only an admin can approve or reject" }, { status: 403 });
+      if (!canManage) {
+        return NextResponse.json({ error: "This task's management has been delegated to another admin" }, { status: 403 });
+      }
+
+      // Whoever acted resolves any outstanding hand-off offer — it's moot now.
+      task.pendingReviewDelegation = null;
 
       if (body.status === "in_progress") {
         // Reject
@@ -78,27 +81,33 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
         task.rejectionHistory.push({ reviewerId: userId, reason: body.reason, createdAt: new Date() });
         await TaskChatMessage.create({ taskId: task._id, senderId: userId, text: body.reason });
         if (task.assignedTo) {
-          await Notification.create({
-            userId: task.assignedTo,
-            type: "task_rejected",
-            payload: { taskId: task._id, reason: body.reason },
-          });
+          await notify(
+            task.assignedTo.toString(),
+            "task_rejected",
+            `"${task.title}" was rejected`,
+            { description: body.reason, payload: { taskId: task._id, reason: body.reason } }
+          );
         }
       } else if (body.status === "done") {
         // Approve
         if (task.assignedTo) {
-          await Notification.create({
-            userId: task.assignedTo,
-            type: "task_approved",
-            payload: { taskId: task._id },
-          });
+          await notify(
+            task.assignedTo.toString(),
+            "task_approved",
+            `"${task.title}" was approved`,
+            { payload: { taskId: task._id } }
+          );
         }
         if (task.recurrence !== "none") {
+          // The old assignee may no longer be an eligible member (left, or promoted to admin) by the time
+          // the recurrence fires — don't blindly carry over an assignment that's no longer valid.
+          const carryAssignee =
+            task.assignedTo && (await isAssignableMember(groupId, task.assignedTo.toString())) ? task.assignedTo : null;
           await Task.create({
             projectId: task.projectId,
             title: task.title,
             description: task.description,
-            assignedTo: task.assignedTo,
+            assignedTo: carryAssignee,
             createdBy: task.createdBy,
             deadline: nextDueDate(task.deadline, task.recurrence as "daily" | "weekly" | "monthly"),
             recurrence: task.recurrence,
@@ -113,12 +122,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
       if (body.status === "pending_review") {
         task.submittedAt = new Date();
         const admins = await GroupMember.find({ groupId, role: "admin" });
-        await Notification.insertMany(
-          admins.map((a) => ({
-            userId: a.userId,
-            type: "task_submitted",
-            payload: { taskId: task._id },
-          }))
+        await notifyMany(
+          admins.map((a) => a.userId.toString()),
+          "task_submitted",
+          `${session.user.name} submitted "${task.title}" for review`,
+          { payload: { taskId: task._id } }
         );
       }
     }
@@ -127,8 +135,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
     task.status = body.status;
   }
 
-  // --- Field edits (admin only) ---
-  if (admin) {
+  // --- Field edits (admin only, and only the delegated manager once one's been accepted) ---
+  if (admin && canManage) {
     const editable = ["title", "description", "deadline", "recurrence"] as const;
     for (const key of editable) {
       if (key in body) (task as Record<string, unknown>)[key] = body[key];
@@ -139,6 +147,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
           return NextResponse.json({ error: "Tasks can only be assigned to a regular member, not an admin" }, { status: 400 });
         }
       }
+      const oldAssignee = task.assignedTo?.toString() ?? null;
+      const newAssignee = body.assignedTo ?? null;
       await TaskHistory.create({
         taskId: task._id,
         actorId: userId,
@@ -146,7 +156,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
         oldValue: task.assignedTo,
         newValue: body.assignedTo,
       });
-      task.assignedTo = body.assignedTo ?? null;
+      task.assignedTo = newAssignee;
+      if (newAssignee && newAssignee !== oldAssignee) {
+        await notify(newAssignee, "task_reassigned", `You were assigned "${task.title}"`, { payload: { taskId: task._id } });
+      }
     }
   }
 
@@ -164,9 +177,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ task
   if (!ctx?.project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const { task, project, group } = ctx;
 
-  const admin = await isGroupAdmin(project.groupId.toString(), session.user.id, group?.orgId?.toString() ?? null);
+  const orgId = group?.orgId?.toString() ?? null;
+  const admin = await isGroupAdmin(project.groupId.toString(), session.user.id, orgId);
   const isCreator = task.createdBy.toString() === session.user.id;
-  if (!admin && !isCreator) {
+  // Once management is delegated, deletion rights move with it too — the original creator
+  // no longer gets a bypass, except the org owner, who always keeps a fallback.
+  const canManage = await canManageTask(task.reviewerId?.toString() ?? null, orgId, session.user.id, admin || isCreator);
+  if (!canManage) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

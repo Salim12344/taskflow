@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { connectDB } from "@/lib/db";
 import DMThread from "@/models/DMThread";
 import DMMessage from "@/models/DMMessage";
+import { getTypingUsers } from "@/lib/typing";
 
 async function requireParticipant(threadId: string, userId: string) {
   const thread = await DMThread.findById(threadId);
@@ -28,7 +29,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ threadI
     { $set: { readAt: new Date() } }
   );
 
-  return NextResponse.json({ messages });
+  const typingUsers = await getTypingUsers("dm", threadId, session.user.id);
+  return NextResponse.json({ messages, otherTyping: typingUsers.length > 0 });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ threadId: string }> }) {

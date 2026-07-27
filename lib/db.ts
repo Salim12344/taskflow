@@ -1,4 +1,12 @@
 import mongoose from "mongoose";
+import dns from "dns";
+
+// ponytail: Node's resolver occasionally can't reach whatever local/link-local DNS
+// server it inherited on Windows dev machines, causing SRV lookup timeouts against
+// Atlas even though the OS resolver works fine. Pointing it at public DNS fixes it.
+if (process.platform === "win32") {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+}
 
 const MONGODB_URI = process.env.MONGODB_URI;
 

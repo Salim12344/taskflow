@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db";
 import Group from "@/models/Group";
 import GroupMember from "@/models/GroupMember";
 import { isGroupMember } from "@/lib/permissions";
+import { maskPresence } from "@/lib/presence";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ groupId: string }> }) {
   const session = await auth();
@@ -17,6 +18,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ groupId
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const members = await GroupMember.find({ groupId }).populate("userId", "name email");
-  return NextResponse.json({ members });
+  const members = await GroupMember.find({ groupId }).populate("userId", "name email avatarUrl lastActiveAt showOnlineStatus");
+  const masked = members.map((m) => {
+    const plain = m.toObject();
+    plain.userId.lastActiveAt = maskPresence(plain.userId);
+    return plain;
+  });
+
+  return NextResponse.json({ members: masked });
 }

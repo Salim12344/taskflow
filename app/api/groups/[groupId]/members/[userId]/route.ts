@@ -5,12 +5,38 @@ import Group from "@/models/Group";
 import GroupMember from "@/models/GroupMember";
 import Project from "@/models/Project";
 import Task from "@/models/Task";
-import Notification from "@/models/Notification";
-import { isGroupAdmin, countAdmins, countPendingReviewTasks } from "@/lib/permissions";
+import User from "@/models/User";
+import { notifyMany } from "@/lib/notify";
+import { isGroupAdmin, countPendingReviewTasks, hasAnotherAdmin, isOrgOwnerOfGroup } from "@/lib/permissions";
 
 async function projectIdsFor(groupId: string) {
   const projects = await Project.find({ groupId }, "_id");
   return projects.map((p) => p._id.toString());
+}
+
+/** Forced removal auto-unassigns — the removing admin takes responsibility for the fallout. */
+async function unassignActiveTasks(groupId: string, userId: string) {
+  const projectIds = await projectIdsFor(groupId);
+  const assignedTasks = await Task.find({ projectId: { $in: projectIds }, assignedTo: userId, deletedAt: null, status: { $ne: "done" } });
+  if (assignedTasks.length === 0) return 0;
+
+  await Task.updateMany({ _id: { $in: assignedTasks.map((t) => t._id) } }, { $set: { assignedTo: null } });
+  const admins = await GroupMember.find({ groupId, role: "admin" });
+  const removedUser = await User.findById(userId, "name");
+  await notifyMany(
+    admins.map((a) => a.userId.toString()),
+    "tasks_unassigned",
+    `${assignedTasks.length} task(s) unassigned from ${removedUser?.name ?? "a removed member"} — need reassigning`,
+    { payload: { groupId, unassignedFromUserId: userId, taskIds: assignedTasks.map((t) => t._id) } }
+  );
+  return assignedTasks.length;
+}
+
+/** Promotion is blocked, not auto-unassigned — admins can never hold a task, so the promoter must clear these first. */
+async function activeTaskCounts(groupId: string, userId: string) {
+  const projectIds = await projectIdsFor(groupId);
+  const tasks = await Task.find({ projectId: { $in: projectIds }, assignedTo: userId, deletedAt: null, status: { $ne: "done" } }, "status");
+  return { total: tasks.length, pendingReview: tasks.filter((t) => t.status === "pending_review").length };
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ groupId: string; userId: string }> }) {
@@ -18,43 +44,39 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ grou
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { groupId, userId } = await params;
+
+  // Self-removal must go through /leave, which enforces the pending-review block — this
+  // endpoint is the forceful admin-on-someone-else action and must not become a loophole.
+  if (userId === session.user.id) {
+    return NextResponse.json({ error: "Use the leave-group action to remove yourself" }, { status: 400 });
+  }
+
   await connectDB();
   const group = await Group.findOne({ _id: groupId, deletedAt: null });
   if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!(await isGroupAdmin(groupId, session.user.id, group.orgId?.toString() ?? null))) {
+  const orgId = group.orgId?.toString() ?? null;
+  if (!(await isGroupAdmin(groupId, session.user.id, orgId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const target = await GroupMember.findOne({ groupId, userId });
   if (!target) return NextResponse.json({ error: "Not a member" }, { status: 404 });
 
-  if (target.role === "admin" && (await countAdmins(groupId)) <= 1) {
+  if (await isOrgOwnerOfGroup(orgId, userId)) {
+    return NextResponse.json({ error: "The organization owner can't be removed from a group they own" }, { status: 400 });
+  }
+
+  if (target.role === "admin" && !(await hasAnotherAdmin(groupId, orgId, userId))) {
     return NextResponse.json(
       { error: "Promote another member to admin before leaving/stepping down" },
       { status: 409 }
     );
   }
 
-  const projectIds = await projectIdsFor(groupId);
-  const assignedTasks = await Task.find({ projectId: { $in: projectIds }, assignedTo: userId, deletedAt: null });
-  if (assignedTasks.length > 0) {
-    await Task.updateMany(
-      { _id: { $in: assignedTasks.map((t) => t._id) } },
-      { $set: { assignedTo: null } }
-    );
-    const admins = await GroupMember.find({ groupId, role: "admin" });
-    await Notification.insertMany(
-      admins.map((a) => ({
-        userId: a.userId,
-        type: "tasks_unassigned",
-        payload: { groupId, removedUserId: userId, taskIds: assignedTasks.map((t) => t._id) },
-      }))
-    );
-  }
-
+  const tasksUnassigned = await unassignActiveTasks(groupId, userId);
   await GroupMember.deleteOne({ groupId, userId });
 
-  return NextResponse.json({ ok: true, tasksUnassigned: assignedTasks.length });
+  return NextResponse.json({ ok: true, tasksUnassigned });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ groupId: string; userId: string }> }) {
@@ -70,15 +92,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ groupI
   await connectDB();
   const group = await Group.findOne({ _id: groupId, deletedAt: null });
   if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!(await isGroupAdmin(groupId, session.user.id, group.orgId?.toString() ?? null))) {
+  const orgId = group.orgId?.toString() ?? null;
+  if (!(await isGroupAdmin(groupId, session.user.id, orgId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const target = await GroupMember.findOne({ groupId, userId });
   if (!target) return NextResponse.json({ error: "Not a member" }, { status: 404 });
 
+  if (role === "member" && (await isOrgOwnerOfGroup(orgId, userId))) {
+    return NextResponse.json({ error: "The organization owner can't be demoted in a group they own" }, { status: 400 });
+  }
+
   if (target.role === "admin" && role === "member") {
-    if ((await countAdmins(groupId)) <= 1) {
+    if (!(await hasAnotherAdmin(groupId, orgId, userId))) {
       return NextResponse.json(
         { error: "Promote another member to admin before leaving/stepping down" },
         { status: 409 }
@@ -96,6 +123,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ groupI
           { status: 409 }
         );
       }
+    }
+  }
+
+  // Admins can never hold an assigned task — promotion is blocked (not auto-unassigned) until
+  // they finish or get reassigned off whatever they currently have.
+  if (target.role === "member" && role === "admin") {
+    const { total, pendingReview } = await activeTaskCounts(groupId, userId);
+    if (total > 0) {
+      // Not "your review" — whoever reviews these may be a different admin if review's been delegated.
+      const detail = pendingReview > 0 ? `, ${pendingReview} pending review` : "";
+      return NextResponse.json(
+        {
+          error: `This member has ${total} task(s) pending completion${detail}. Reassign or have them finish before promoting.`,
+        },
+        { status: 409 }
+      );
     }
   }
 

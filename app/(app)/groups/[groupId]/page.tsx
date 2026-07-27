@@ -5,11 +5,31 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { api } from "@/lib/api-client";
 import { groupIcon } from "@/lib/group-icon";
+import { Avatar } from "@/components/Avatar";
+import { isOnline, formatLastSeen } from "@/lib/presence";
 
 type Group = { _id: string; name: string };
 type Project = { _id: string; name: string; description: string; status: string };
-type Member = { _id: string; userId: { _id: string; name: string; email: string }; role: "admin" | "member" };
-type GroupMessage = { _id: string; text: string; senderId: { _id: string; name: string } | string; createdAt: string; isSystemMessage?: boolean };
+type Member = { _id: string; userId: { _id: string; name: string; email: string; avatarUrl: string | null; lastActiveAt: string | null }; role: "admin" | "member" };
+type ReadReceipt = { userId: { _id: string; name: string; avatarUrl: string | null }; readAt: string };
+type GroupMessage = {
+  _id: string; text: string; senderId: { _id: string; name: string; avatarUrl: string | null } | string;
+  createdAt: string; isSystemMessage?: boolean; readBy: ReadReceipt[]; mentions: { _id: string; name: string }[];
+};
+
+function renderWithMentions(text: string, mentions: { _id: string; name: string }[]) {
+  if (mentions.length === 0) return text;
+  const names = mentions.map((m) => m.name).sort((a, b) => b.length - a.length);
+  const pattern = new RegExp(`(@(?:${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")}))`, "g");
+  const parts = text.split(pattern);
+  return parts.map((part, i) =>
+    names.some((n) => part === `@${n}`) ? (
+      <span key={i} style={{ color: "var(--color-accent-300)", fontWeight: 600 }}>{part}</span>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
 
 export default function GroupPage({ params }: { params: Promise<{ groupId: string }> }) {
   const { groupId } = usePromise(params);
@@ -26,7 +46,12 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   const [error, setError] = useState<string | null>(null);
   const [showNewProject, setShowNewProject] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const [seenByModal, setSeenByModal] = useState<ReadReceipt[] | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionMap, setMentionMap] = useState<Record<string, string>>({}); // name -> userId
+  const [typingUsers, setTypingUsers] = useState<{ _id: string; name: string }[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const lastTypingPingRef = useRef(0);
 
   function loadAll() {
     api<{ group: Group; showOnboarding: boolean }>(`/api/groups/${groupId}`)
@@ -41,8 +66,8 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   }
 
   function loadMessages() {
-    api<{ messages: GroupMessage[] }>(`/api/groups/${groupId}/messages`)
-      .then((d) => setMessages(d.messages))
+    api<{ messages: GroupMessage[]; typingUsers: { _id: string; name: string }[] }>(`/api/groups/${groupId}/messages`)
+      .then((d) => { setMessages(d.messages); setTypingUsers(d.typingUsers); })
       .catch((e) => setError(e.message));
   }
 
@@ -113,13 +138,36 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     e.preventDefault();
     if (!composer.trim()) return;
     const text = composer;
+    const mentionIds = Object.entries(mentionMap)
+      .filter(([name]) => text.includes(`@${name}`))
+      .map(([, id]) => id);
     setComposer("");
+    setMentionMap({});
+    setMentionQuery(null);
     try {
-      await api(`/api/groups/${groupId}/messages`, { method: "POST", body: JSON.stringify({ text }) });
+      await api(`/api/groups/${groupId}/messages`, { method: "POST", body: JSON.stringify({ text, mentions: mentionIds }) });
       loadMessages();
     } catch (e) {
       setError((e as Error).message);
     }
+  }
+
+  function onComposerChange(value: string) {
+    setComposer(value);
+    const match = value.match(/@([a-zA-Z]*)$/);
+    setMentionQuery(match ? match[1] : null);
+
+    const now = Date.now();
+    if (now - lastTypingPingRef.current > 2500) {
+      lastTypingPingRef.current = now;
+      api(`/api/groups/${groupId}/typing`, { method: "POST" }).catch(() => {});
+    }
+  }
+
+  function pickMention(name: string, userId: string) {
+    setComposer((c) => c.replace(/@[a-zA-Z]*$/, `@${name} `));
+    setMentionMap((m) => ({ ...m, [name]: userId }));
+    setMentionQuery(null);
   }
 
   async function messageMember(userId: string) {
@@ -207,7 +255,9 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
             {messages.map((m) => {
               const senderId = typeof m.senderId === "string" ? m.senderId : m.senderId._id;
               const senderName = typeof m.senderId === "string" ? "" : m.senderId.name;
+              const senderAvatar = typeof m.senderId === "string" ? null : m.senderId.avatarUrl;
               const mine = senderId === session?.user?.id;
+              const iAmMentioned = !mine && m.mentions.some((mn) => mn._id === session?.user?.id);
               if (m.isSystemMessage) {
                 return (
                   <div key={m._id} style={{ textAlign: "center", fontSize: 12, color: "color-mix(in srgb, var(--color-text) 45%, transparent)" }}>
@@ -216,20 +266,64 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                 );
               }
               return (
-                <div key={m._id} style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", maxWidth: "58%", alignSelf: mine ? "flex-end" : "flex-start" }}>
-                  <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--color-text) 55%, transparent)", marginBottom: 3, padding: "0 2px" }}>
-                    {senderName} · {new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                  </div>
-                  <div style={{ padding: "9px 13px", borderRadius: 14, fontSize: 14, lineHeight: 1.4, background: mine ? "var(--color-accent)" : "var(--color-surface)", color: mine ? "var(--color-bg)" : "var(--color-text)" }}>
-                    {m.text}
+                <div key={m._id} style={{ display: "flex", gap: 8, alignSelf: mine ? "flex-end" : "flex-start", flexDirection: mine ? "row-reverse" : "row", maxWidth: "58%" }}>
+                  {!mine && <Avatar name={senderName} avatarUrl={senderAvatar} size={26} />}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start" }}>
+                    <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--color-text) 55%, transparent)", marginBottom: 3, padding: "0 2px" }}>
+                      {senderName} · {new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                    </div>
+                    <div
+                      style={{
+                        padding: "9px 13px",
+                        borderRadius: 14,
+                        fontSize: 14,
+                        lineHeight: 1.4,
+                        background: mine ? "var(--color-accent)" : iAmMentioned ? "var(--color-amber-bg)" : "var(--color-surface)",
+                        color: mine ? "var(--color-bg)" : "var(--color-text)",
+                        border: iAmMentioned ? "1px solid var(--color-amber)" : "1px solid transparent",
+                      }}
+                    >
+                      {renderWithMentions(m.text, m.mentions)}
+                    </div>
+                    {mine && m.readBy.length > 0 && (
+                      <button
+                        onClick={() => setSeenByModal(m.readBy)}
+                        style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 2px 0", fontSize: 11, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}
+                      >
+                        Seen by {m.readBy.length}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
             })}
             <div ref={chatEndRef} />
           </div>
-          <form onSubmit={sendMessage} style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <input className="input" placeholder={`Message ${group?.name ?? "group"}…`} value={composer} onChange={(e) => setComposer(e.target.value)} style={{ flex: 1 }} />
+          {typingUsers.length > 0 && (
+            <div style={{ fontSize: 12, fontStyle: "italic", color: "color-mix(in srgb, var(--color-text) 50%, transparent)", padding: "2px 4px" }}>
+              {typingUsers.map((t) => t.name).join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing…
+            </div>
+          )}
+          <form onSubmit={sendMessage} style={{ display: "flex", gap: 8, marginTop: 10, position: "relative" }}>
+            {mentionQuery !== null && (
+              <div className="card elev-sm" style={{ position: "absolute", bottom: "100%", left: 0, marginBottom: 6, width: 220, padding: 6, gap: 2, zIndex: 20 }}>
+                {members
+                  ?.filter((m) => m.userId._id !== session?.user?.id && m.userId.name.toLowerCase().startsWith(mentionQuery.toLowerCase()))
+                  .slice(0, 5)
+                  .map((m) => (
+                    <div
+                      key={m.userId._id}
+                      className="row-hover"
+                      onClick={() => pickMention(m.userId.name, m.userId._id)}
+                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+                    >
+                      <Avatar name={m.userId.name} avatarUrl={m.userId.avatarUrl} size={20} fontSize={9.5} />
+                      {m.userId.name}
+                    </div>
+                  ))}
+              </div>
+            )}
+            <input className="input" placeholder={`Message ${group?.name ?? "group"}… (@ to mention)`} value={composer} onChange={(e) => onComposerChange(e.target.value)} style={{ flex: 1 }} />
             <button className="btn btn-primary btn-icon" type="submit">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
             </button>
@@ -248,8 +342,16 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                 return (
                   <tr key={m._id} className="row-hover" style={{ cursor: "default" }}>
                     <td>
-                      <div>{m.userId.name}</div>
-                      <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{m.userId.email}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <Avatar name={m.userId.name} avatarUrl={m.userId.avatarUrl} size={28} online={isOnline(m.userId.lastActiveAt)} />
+                        <div>
+                          <div>{m.userId.name}</div>
+                          <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{m.userId.email}</div>
+                          <div style={{ fontSize: 11 }}>
+                            {isOnline(m.userId.lastActiveAt) ? <span style={{ color: "var(--color-green)" }}>Online</span> : <span style={{ color: "color-mix(in srgb, var(--color-text) 45%, transparent)" }}>{formatLastSeen(m.userId.lastActiveAt)}</span>}
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td><span className={m.role === "admin" ? "tag tag-accent" : "tag tag-neutral"}>{m.role}</span></td>
                     <td style={{ textAlign: "right" }}>
@@ -278,6 +380,31 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
           </table>
           </div>
           {!isAdmin && <div style={{ fontSize: 12.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)", marginTop: 12 }}>Only admins can manage members.</div>}
+        </div>
+      )}
+
+      {seenByModal && (
+        <div
+          onClick={() => setSeenByModal(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} className="card elev-sm" style={{ width: 320, maxHeight: "70vh", overflowY: "auto" }}>
+            <div className="card-title">Seen by</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {seenByModal.map((r) => (
+                <div key={r.userId._id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Avatar name={r.userId.name} avatarUrl={r.userId.avatarUrl} size={28} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13.5 }}>{r.userId.name}</div>
+                    <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>
+                      {new Date(r.readAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button className="btn btn-secondary btn-block" onClick={() => setSeenByModal(null)}>Close</button>
+          </div>
         </div>
       )}
     </div>
