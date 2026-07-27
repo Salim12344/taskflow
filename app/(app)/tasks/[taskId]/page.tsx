@@ -83,16 +83,19 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
 
   const userId = session?.user?.id;
   const isAssignee = task?.assignedTo === userId;
-  const isAdmin = members.some((m) => m.userId._id === userId && m.role === "admin");
+  // Approximates server enforcement for showing/hiding buttons; server is the source of truth.
+  // An org owner may not have an explicit GroupMember row, so accountType fills that gap here.
+  const isOrgAccount = session?.user?.accountType === "organization";
+  const isAdmin = isOrgAccount || members.some((m) => m.userId._id === userId && m.role === "admin");
   const isCreator = task?.createdBy === userId;
   const nameFor = (id: string | null) => (id ? members.find((m) => m.userId._id === id)?.userId.name ?? "—" : "Unassigned");
   const otherAdmins = members.filter((m) => m.role === "admin" && m.userId._id !== userId);
 
-  // Approximates server enforcement for showing/hiding buttons; server is the source of truth
-  // (an org owner who isn't explicitly listed as admin here may still succeed server-side).
+  // Default manager is whoever created/assigned the task, not "any admin" — that's the whole
+  // point of delegation existing. Once delegated, control fully moves to that admin.
   const isDesignatedManager = !!task?.reviewerId && task.reviewerId === userId;
-  const canManage = isAdmin && (!task?.reviewerId || isDesignatedManager);
-  const canDelete = task?.reviewerId ? isDesignatedManager : isAdmin || isCreator;
+  const canManage = task?.reviewerId ? isDesignatedManager || isOrgAccount : isCreator || isOrgAccount;
+  const canDelete = canManage;
   const delegation = task?.pendingReviewDelegation ?? null;
   const isDelegationTarget = !!delegation && delegation.toUserId === userId;
 
@@ -217,16 +220,16 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                 ) : (
                   <div style={{ fontSize: 13.5 }}>
                     Hand-off pending — waiting on {nameFor(delegation.toUserId)} to accept.
-                    {isAdmin && (
+                    {(delegation.fromUserId === userId || isOrgAccount) && (
                       <button className="btn btn-secondary" style={{ marginLeft: 8, padding: "2px 8px", fontSize: 12 }} onClick={cancelDelegate}>Cancel</button>
                     )}
                   </div>
                 )
               ) : (
-                <div style={{ fontSize: 14 }}>{task.reviewerId ? nameFor(task.reviewerId) : "Any group admin"}</div>
+                <div style={{ fontSize: 14 }}>{nameFor(task.reviewerId ?? task.createdBy)}</div>
               )}
 
-              {isAdmin && !delegation && otherAdmins.length > 0 && (
+              {canManage && !delegation && otherAdmins.length > 0 && (
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   <select className="input" value={delegateTarget} onChange={(e) => setDelegateTarget(e.target.value)}>
                     <option value="">{task.reviewerId ? "Hand off to…" : "Hand off to…"}</option>

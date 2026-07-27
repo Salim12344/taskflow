@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { notify } from "@/lib/notify";
-import { isGroupAdmin } from "@/lib/permissions";
+import { isGroupAdmin, isOrgOwnerOfGroup, canManageTask } from "@/lib/permissions";
 import { loadTaskContext } from "@/lib/task-context";
 
 export async function POST(req: Request, { params }: { params: Promise<{ taskId: string }> }) {
@@ -21,8 +21,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
   if (task.status === "done") {
     return NextResponse.json({ error: "This task is already done" }, { status: 400 });
   }
-  if (!(await isGroupAdmin(groupId, session.user.id, orgId))) {
-    return NextResponse.json({ error: "Only an admin can delegate review" }, { status: 403 });
+  const isCreator = task.createdBy.toString() === session.user.id;
+  const isOrgOwner = await isOrgOwnerOfGroup(orgId, session.user.id);
+  const canManage = await canManageTask(task.reviewerId?.toString() ?? null, orgId, session.user.id, isCreator || isOrgOwner);
+  if (!canManage) {
+    return NextResponse.json({ error: "Only this task's current manager can hand it off" }, { status: 403 });
   }
   if (toUserId === session.user.id) {
     return NextResponse.json({ error: "You can't delegate a task to yourself" }, { status: 400 });
@@ -53,11 +56,14 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ task
   if (!ctx?.project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const { task, project, group } = ctx;
 
-  if (!(await isGroupAdmin(project.groupId.toString(), session.user.id, group.orgId?.toString() ?? null))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
   if (!task.pendingReviewDelegation) {
     return NextResponse.json({ error: "No pending delegation to cancel" }, { status: 404 });
+  }
+  const orgId = group.orgId?.toString() ?? null;
+  const isRequester = task.pendingReviewDelegation.fromUserId.toString() === session.user.id;
+  const isOrgOwner = await isOrgOwnerOfGroup(orgId, session.user.id);
+  if (!isRequester && !isOrgOwner) {
+    return NextResponse.json({ error: "Only the admin who sent this hand-off can cancel it" }, { status: 403 });
   }
 
   task.pendingReviewDelegation = null;
