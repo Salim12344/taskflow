@@ -23,7 +23,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
 
   const isAssignee = task.assignedTo?.toString() === session.user.id;
   const isCreator = task.createdBy.toString() === session.user.id;
-  const isManager = canManageTask(task.reviewerId?.toString() ?? null, session.user.id, isCreator);
+  const orgId = group.orgId?.toString() ?? null;
+  const isManager = await canManageTask(task.reviewerId?.toString() ?? null, orgId, session.user.id, isCreator);
 
   if (!isAssignee && !isManager) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 

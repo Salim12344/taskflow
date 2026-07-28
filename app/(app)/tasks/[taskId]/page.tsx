@@ -92,11 +92,14 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   const otherAdmins = members.filter((m) => m.role === "admin" && m.userId._id !== userId);
 
   // Default manager is whoever created/assigned the task, not "any admin" — that's the whole
-  // point of delegation existing. Once delegated, control fully moves to that admin. The org
-  // owner is never a bypass here — their role over tasks is view-only.
+  // point of delegation existing. Once delegated, control fully moves to that admin (plus the
+  // org owner, who always keeps an emergency fallback to act on the task).
   const isDesignatedManager = !!task?.reviewerId && task.reviewerId === userId;
-  const canManage = task?.reviewerId ? isDesignatedManager : isCreator;
+  const canManage = task?.reviewerId ? isDesignatedManager || isOrgAccount : isCreator || isOrgAccount;
   const canDelete = canManage;
+  // Handing a task off reassigns who's accountable for it — narrower than canManage, so even
+  // the org owner's emergency override doesn't extend to it, only the creator/current delegate.
+  const canDelegate = isDesignatedManager || (!task?.reviewerId && isCreator);
   const delegation = task?.pendingReviewDelegation ?? null;
   const isDelegationTarget = !!delegation && delegation.toUserId === userId;
 
@@ -230,7 +233,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                 <div style={{ fontSize: 14 }}>{nameFor(task.reviewerId ?? task.createdBy)}</div>
               )}
 
-              {canManage && !delegation && otherAdmins.length > 0 && (
+              {canDelegate && !delegation && otherAdmins.length > 0 && (
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   <select className="input" value={delegateTarget} onChange={(e) => setDelegateTarget(e.target.value)}>
                     <option value="">{task.reviewerId ? "Hand off to…" : "Hand off to…"}</option>

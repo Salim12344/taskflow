@@ -21,11 +21,9 @@ async function loadChatContext(taskId: string, userId: string) {
 
   const admin = await isGroupAdmin(groupId, userId, orgId);
   const isAssignee = task.assignedTo?.toString() === userId;
-  const isManager = canManageTask(task.reviewerId?.toString() ?? null, userId, task.createdBy.toString() === userId);
+  const isManager = await canManageTask(task.reviewerId?.toString() ?? null, orgId, userId, task.createdBy.toString() === userId);
   const canRead = admin || isAssignee;
-  // Writing is exclusive to the assignee and the task's actual manager (creator, or the admin
-  // it's been delegated to) — an org owner reading along as "admin" doesn't get write access.
-  const canWrite = isAssignee || isManager;
+  const canWrite = isAssignee || (admin && isManager);
 
   return { task, canRead, canWrite, isAssignee, isManager };
 }

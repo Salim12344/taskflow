@@ -90,11 +90,18 @@ export async function isOrgOwnerOfGroup(orgId: string | null, userId: string) {
 }
 
 /**
- * Task management is exclusive to whoever assigned the task (or, once accepted, the admin
- * it was delegated to) — nobody else, not even the org owner. The org owner's role over
- * tasks is observation only (read access via isGroupAdmin), never a management override.
+ * Task management belongs to whoever assigned the task (or, once accepted, the admin it was
+ * delegated to) — other admins lose those rights on it. The org owner keeps a permanent
+ * emergency override on every task regardless, since they can never truly be locked out of
+ * their own org.
  */
-export function canManageTask(reviewerId: string | null, userId: string, fallback: boolean) {
+export async function canManageTask(
+  reviewerId: string | null,
+  orgId: string | null,
+  userId: string,
+  fallback: boolean
+) {
+  if (await isOrgOwnerOfGroup(orgId, userId)) return true;
   if (!reviewerId) return fallback;
   return reviewerId === userId;
 }

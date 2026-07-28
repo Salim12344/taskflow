@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { notify } from "@/lib/notify";
-import { isGroupAdmin, canManageTask } from "@/lib/permissions";
+import { isGroupAdmin } from "@/lib/permissions";
 import { loadTaskContext } from "@/lib/task-context";
 
 export async function POST(req: Request, { params }: { params: Promise<{ taskId: string }> }) {
@@ -21,11 +21,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
   if (task.status === "done") {
     return NextResponse.json({ error: "This task is already done" }, { status: 400 });
   }
+  const reviewerId = task.reviewerId?.toString() ?? null;
   const isCreator = task.createdBy.toString() === session.user.id;
-  // Only this task's current manager (the creator, or the admin it's been delegated to) can
-  // hand it off — the org owner is never a bypass, their role over tasks is view-only.
-  const canManage = canManageTask(task.reviewerId?.toString() ?? null, session.user.id, isCreator);
-  if (!canManage) {
+  // Deliberately narrower than canManageTask: handing a task off reassigns who's accountable
+  // for it going forward, so it's exclusive to the creator or current delegate — even the org
+  // owner's emergency override doesn't extend to reshuffling management, only acting on it.
+  const canDelegate = reviewerId ? reviewerId === session.user.id : isCreator;
+  if (!canDelegate) {
     return NextResponse.json({ error: "Only this task's current manager can hand it off" }, { status: 403 });
   }
   if (toUserId === session.user.id) {
