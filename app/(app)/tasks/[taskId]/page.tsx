@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState, use as usePromise } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { api } from "@/lib/api-client";
+import { api, uploadFile, type Attachment } from "@/lib/api-client";
 import { Avatar } from "@/components/Avatar";
+import { AttachmentView } from "@/components/AttachmentView";
+import { useVoiceRecorder } from "@/lib/use-voice-recorder";
 
 type Task = {
   _id: string;
@@ -22,7 +24,8 @@ type Task = {
 };
 type Project = { _id: string; name: string; groupId: string };
 type Member = { userId: { _id: string; name: string; avatarUrl: string | null }; role: "admin" | "member" };
-type ChatMessage = { _id: string; text: string; senderId: string; createdAt: string };
+type ReplyTo = { messageId: string; text: string; senderName: string };
+type ChatMessage = { _id: string; text: string; senderId: string; createdAt: string; replyTo: ReplyTo | null; attachments: Attachment[] };
 
 const STATUS_LABEL: Record<string, string> = {
   todo: "To do",
@@ -46,7 +49,11 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatCanWrite, setChatCanWrite] = useState(false);
   const [composer, setComposer] = useState("");
+  const [replyingTo, setReplyingTo] = useState<{ _id: string; text: string; senderName: string } | null>(null);
+  const [sendingAttachment, setSendingAttachment] = useState(false);
+  const voice = useVoiceRecorder();
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function load() {
     api<{ task: Task }>(`/api/tasks/${taskId}`)
@@ -168,12 +175,45 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
     if (!composer.trim()) return;
     const text = composer;
     setComposer("");
+    const replyToId = replyingTo?._id;
+    setReplyingTo(null);
     try {
-      await api(`/api/tasks/${taskId}/chat`, { method: "POST", body: JSON.stringify({ text }) });
+      await api(`/api/tasks/${taskId}/chat`, { method: "POST", body: JSON.stringify({ text, replyToId }) });
       loadChat();
     } catch (e) {
       setError((e as Error).message);
     }
+  }
+
+  async function sendAttachment(file: Blob, filename: string) {
+    setSendingAttachment(true);
+    const replyToId = replyingTo?._id;
+    setReplyingTo(null);
+    try {
+      const attachment = await uploadFile(file, filename);
+      await api(`/api/tasks/${taskId}/chat`, { method: "POST", body: JSON.stringify({ text: "", attachments: [attachment], replyToId }) });
+      loadChat();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSendingAttachment(false);
+    }
+  }
+
+  async function startVoicePress() {
+    if (!voice.recording) await voice.start();
+  }
+
+  async function endVoicePress() {
+    if (!voice.recording) return;
+    const blob = await voice.stop();
+    if (blob && blob.size > 0) await sendAttachment(blob, `voice-note.${blob.type.includes("mp4") ? "m4a" : "webm"}`);
+  }
+
+  function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) sendAttachment(file, file.name);
   }
 
   if (!task) {
@@ -306,14 +346,32 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
               const mine = m.senderId === userId;
               const sender = members.find((mem) => mem.userId._id === m.senderId);
               return (
-                <div key={m._id} style={{ display: "flex", gap: 8, alignSelf: mine ? "flex-end" : "flex-start", flexDirection: mine ? "row-reverse" : "row", maxWidth: "80%" }}>
+                <div key={m._id} className="row-hover" style={{ display: "flex", gap: 8, alignSelf: mine ? "flex-end" : "flex-start", flexDirection: mine ? "row-reverse" : "row", maxWidth: "80%" }}>
                   {!mine && <Avatar name={sender?.userId.name ?? "?"} avatarUrl={sender?.userId.avatarUrl} size={24} />}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start" }}>
                     <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--color-text) 55%, transparent)", marginBottom: 3, padding: "0 2px" }}>
                       {sender?.userId.name ?? "—"} · {new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                     </div>
-                    <div style={{ padding: "8px 12px", borderRadius: 12, fontSize: 13.5, lineHeight: 1.4, background: mine ? "var(--color-accent)" : "var(--color-bg)", color: mine ? "var(--color-bg)" : "var(--color-text)" }}>
-                      {m.text}
+                    <div style={{ display: "flex", gap: 4, alignItems: "flex-end", flexDirection: mine ? "row-reverse" : "row" }}>
+                      <div style={{ padding: "8px 12px", borderRadius: 12, fontSize: 13.5, lineHeight: 1.4, background: mine ? "var(--color-accent)" : "var(--color-bg)", color: mine ? "var(--color-bg)" : "var(--color-text)" }}>
+                        {m.replyTo && (
+                          <div style={{ borderLeft: "2px solid currentColor", opacity: 0.7, paddingLeft: 8, marginBottom: 5, fontSize: 12 }}>
+                            <div style={{ fontWeight: 600 }}>{m.replyTo.senderName}</div>
+                            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{m.replyTo.text}</div>
+                          </div>
+                        )}
+                        {m.attachments?.map((a, i) => <div key={i} style={{ marginBottom: m.text ? 6 : 0 }}><AttachmentView attachment={a} mine={mine} /></div>)}
+                        {m.text}
+                      </div>
+                      {chatCanWrite && (
+                        <button
+                          onClick={() => setReplyingTo({ _id: m._id, text: m.text || "📎 Attachment", senderName: sender?.userId.name ?? "—" })}
+                          title="Reply"
+                          style={{ background: "none", border: "none", cursor: "pointer", padding: 4, opacity: 0.55, flex: "none" }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17l-5-5 5-5M4 12h10a5 5 0 015 5v2" /></svg>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -321,14 +379,50 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
             })}
             <div ref={chatEndRef} />
           </div>
+          {chatCanWrite && replyingTo && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", marginBottom: 8, background: "var(--color-bg)", borderRadius: 8, borderLeft: "3px solid var(--color-accent)" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 600 }}>Replying to {replyingTo.senderName}</div>
+                <div style={{ fontSize: 12, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
+              </div>
+              <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
+            </div>
+          )}
           {chatCanWrite && (
             <form onSubmit={sendChatMessage} style={{ display: "flex", gap: 8 }}>
-              <input className="input" placeholder="Message…" value={composer} onChange={(e) => setComposer(e.target.value)} />
-              <button className="btn btn-primary btn-icon" type="submit">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
+              <input ref={fileInputRef} type="file" onChange={onFilePicked} style={{ display: "none" }} />
+              <button type="button" className="btn btn-secondary btn-icon" disabled={sendingAttachment || voice.recording} onClick={() => fileInputRef.current?.click()} title="Attach a file">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
               </button>
+              <input
+                className="input"
+                placeholder={voice.recording ? "Recording…" : "Message…"}
+                value={composer}
+                disabled={voice.recording}
+                onChange={(e) => setComposer(e.target.value)}
+              />
+              {composer.trim() ? (
+                <button className="btn btn-primary btn-icon" type="submit">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-icon"
+                  disabled={sendingAttachment}
+                  onPointerDown={startVoicePress}
+                  onPointerUp={endVoicePress}
+                  onPointerLeave={endVoicePress}
+                  onPointerCancel={endVoicePress}
+                  title="Hold to record a voice note"
+                  style={{ background: voice.recording ? "oklch(60% 0.2 25)" : "var(--color-accent)", color: "var(--color-bg)", touchAction: "none" }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg>
+                </button>
+              )}
             </form>
           )}
+          {chatCanWrite && voice.error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 12, marginTop: 4 }}>{voice.error}</div>}
         </div>
       </div>
     </div>

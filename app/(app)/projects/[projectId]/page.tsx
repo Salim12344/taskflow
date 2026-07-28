@@ -25,6 +25,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [members, setMembers] = useState<Member[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mobileStatus, setMobileStatus] = useState("todo");
 
   function load() {
     api<{ project: Project }>(`/api/projects/${projectId}`)
@@ -76,6 +77,27 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
             </div>
           );
         })}
+      </div>
+
+      {/* Mobile: a status dropdown instead of a side-scrolling board — nobody wants to swipe sideways on a phone. */}
+      <div className="kanban-mobile-filter" style={{ flexDirection: "column", gap: 12, flex: 1, minHeight: 0 }}>
+        <select className="input" style={{ width: "auto" }} value={mobileStatus} onChange={(e) => setMobileStatus(e.target.value)}>
+          {COLUMNS.map((col) => (
+            <option key={col.key} value={col.key}>{col.label} · {tasks?.filter((t) => t.status === col.key).length ?? 0}</option>
+          ))}
+        </select>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto" }}>
+          {(tasks?.filter((t) => t.status === mobileStatus) ?? []).map((t) => (
+            <div key={t._id} className="card elev-sm kanban-card" onClick={() => router.push(`/tasks/${t._id}`)}>
+              <div className="card-title" style={{ fontSize: 14.5 }}>{t.title}</div>
+              <div className="card-meta">{nameFor(t.assignedTo)}</div>
+              {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due {new Date(t.deadline).toLocaleDateString()}</span></div>}
+            </div>
+          ))}
+          {tasks && tasks.filter((t) => t.status === mobileStatus).length === 0 && (
+            <div className="card-meta">Nothing here.</div>
+          )}
+        </div>
       </div>
     </div>
   );

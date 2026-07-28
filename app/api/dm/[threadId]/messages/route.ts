@@ -38,14 +38,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ threadI
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { threadId } = await params;
-  const { text } = await req.json();
-  if (!text?.trim()) return NextResponse.json({ error: "text is required" }, { status: 400 });
+  const { text, replyToId, attachments } = await req.json();
+  const hasAttachment = Array.isArray(attachments) && attachments.length > 0;
+  if (!text?.trim() && !hasAttachment) return NextResponse.json({ error: "text is required" }, { status: 400 });
 
   await connectDB();
   const thread = await requireParticipant(threadId, session.user.id);
   if (!thread) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const message = await DMMessage.create({ threadId, senderId: session.user.id, text: text.trim() });
+  // Snapshot the quoted message at write time — a reply shouldn't break if the original is later deleted.
+  let replyTo = null;
+  if (replyToId) {
+    const target = await DMMessage.findOne({ _id: replyToId, threadId }).populate("senderId", "name");
+    if (target) {
+      replyTo = { messageId: target._id, text: target.text, senderName: (target.senderId as unknown as { name: string }).name };
+    }
+  }
+
+  const message = await DMMessage.create({
+    threadId,
+    senderId: session.user.id,
+    text: text?.trim() ?? "",
+    replyTo,
+    attachments: hasAttachment ? attachments : [],
+  });
   thread.lastMessageAt = new Date();
   await thread.save();
 

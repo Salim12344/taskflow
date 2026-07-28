@@ -13,6 +13,16 @@ const GroupMessageSchema = new Schema({
     },
   ],
   mentions: [{ type: Schema.Types.ObjectId, ref: "User" }],
+  // Denormalized at write time (same pattern as Notification) so rendering a reply never
+  // needs a join, even if the original message later gets edited or deleted.
+  replyTo: {
+    type: {
+      messageId: { type: Schema.Types.ObjectId, required: true },
+      text: { type: String, required: true },
+      senderName: { type: String, required: true },
+    },
+    default: null,
+  },
   readBy: [
     {
       userId: { type: Schema.Types.ObjectId, ref: "User", required: true },

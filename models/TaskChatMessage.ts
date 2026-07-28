@@ -12,6 +12,14 @@ const TaskChatMessageSchema = new Schema({
       size: { type: Number, required: true },
     },
   ],
+  replyTo: {
+    type: {
+      messageId: { type: Schema.Types.ObjectId, required: true },
+      text: { type: String, required: true },
+      senderName: { type: String, required: true },
+    },
+    default: null,
+  },
   createdAt: { type: Date, default: Date.now },
   readAt: { type: Date, default: null },
 });

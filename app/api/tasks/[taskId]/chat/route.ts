@@ -58,8 +58,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { taskId } = await params;
-  const { text } = await req.json();
-  if (!text?.trim()) return NextResponse.json({ error: "text is required" }, { status: 400 });
+  const { text, replyToId, attachments } = await req.json();
+  const hasAttachment = Array.isArray(attachments) && attachments.length > 0;
+  if (!text?.trim() && !hasAttachment) return NextResponse.json({ error: "text is required" }, { status: 400 });
 
   const ctx = await loadChatContext(taskId, session.user.id);
   if (!ctx) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -67,7 +68,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
     return NextResponse.json({ error: "Only the assignee and the task's manager can post here" }, { status: 403 });
   }
 
-  const message = await TaskChatMessage.create({ taskId, senderId: session.user.id, text: text.trim() });
+  // Snapshot the quoted message at write time — a reply shouldn't break if the original is later deleted.
+  let replyTo = null;
+  if (replyToId) {
+    const target = await TaskChatMessage.findOne({ _id: replyToId, taskId }).populate("senderId", "name");
+    if (target) {
+      replyTo = { messageId: target._id, text: target.text, senderName: (target.senderId as unknown as { name: string }).name };
+    }
+  }
+
+  const message = await TaskChatMessage.create({
+    taskId,
+    senderId: session.user.id,
+    text: text?.trim() ?? "",
+    replyTo,
+    attachments: hasAttachment ? attachments : [],
+  });
 
   return NextResponse.json({ message }, { status: 201 });
 }

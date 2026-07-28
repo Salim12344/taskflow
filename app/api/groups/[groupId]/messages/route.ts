@@ -40,8 +40,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ groupId
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { groupId } = await params;
-  const { text, mentions } = await req.json();
-  if (!text?.trim()) return NextResponse.json({ error: "text is required" }, { status: 400 });
+  const { text, mentions, replyToId, attachments } = await req.json();
+  const hasAttachment = Array.isArray(attachments) && attachments.length > 0;
+  if (!text?.trim() && !hasAttachment) return NextResponse.json({ error: "text is required" }, { status: 400 });
 
   await connectDB();
   const activeGroup = await Group.findOne({ _id: groupId, deletedAt: null });
@@ -58,11 +59,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ groupId
     validMentions = validMembers.map((m) => m.userId.toString());
   }
 
+  // Snapshot the quoted message at write time — a reply shouldn't break if the original is later deleted.
+  let replyTo = null;
+  if (replyToId) {
+    const target = await GroupMessage.findOne({ _id: replyToId, groupId }).populate("senderId", "name");
+    if (target) {
+      replyTo = { messageId: target._id, text: target.text, senderName: (target.senderId as unknown as { name: string }).name };
+    }
+  }
+
   const message = await GroupMessage.create({
     groupId,
     senderId: session.user.id,
-    text: text.trim(),
+    text: text?.trim() ?? "",
     mentions: validMentions,
+    replyTo,
+    attachments: hasAttachment ? attachments : [],
   });
   await message.populate("senderId", "name avatarUrl");
   await message.populate("mentions", "name");
@@ -73,7 +85,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ groupId
       validMentions,
       "mention",
       `${session.user.name} mentioned you in ${group?.name ?? "a group"}`,
-      { description: text.trim(), payload: { groupId, messageId: message._id } }
+      { description: text?.trim() || "🎤 Voice note", payload: { groupId, messageId: message._id } }
     );
   }
 

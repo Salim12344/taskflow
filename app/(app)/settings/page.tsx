@@ -8,12 +8,15 @@ import { Avatar } from "@/components/Avatar";
 type Me = { name: string; email: string; accountType: string; avatarUrl: string | null; showOnlineStatus: boolean };
 
 const PERSONAL_PREFS = [
-  "Added to a group",
   "Task assigned or reassigned to you",
   "Task approved or rejected",
   "New @mention",
   "New direct message",
 ];
+
+// Org owners are auto-admin on every group their org creates — this notification never
+// applies to them there, so it'd be a dead checkbox for the account type it matters least for.
+const GROUP_JOINED_PREF = "Added to a group";
 
 const ADMIN_ONLY_PREFS = [
   "Task submitted for review (you're an admin)",
@@ -39,13 +42,15 @@ export default function SettingsPage() {
         setAvatarUrl(d.user.avatarUrl);
         setShowOnlineStatus(d.user.showOnlineStatus);
         setIsAdminAnywhere(d.isAdminAnywhere);
-        const visiblePrefs = d.isAdminAnywhere ? [...PERSONAL_PREFS, ...ADMIN_ONLY_PREFS] : PERSONAL_PREFS;
+        const base = d.user.accountType === "organization" ? PERSONAL_PREFS : [GROUP_JOINED_PREF, ...PERSONAL_PREFS];
+        const visiblePrefs = d.isAdminAnywhere ? [...base, ...ADMIN_ONLY_PREFS] : base;
         setPrefs(visiblePrefs.map(() => true));
       })
       .catch((e) => setError(e.message));
   }, []);
 
-  const visiblePrefs = isAdminAnywhere ? [...PERSONAL_PREFS, ...ADMIN_ONLY_PREFS] : PERSONAL_PREFS;
+  const base = me?.accountType === "organization" ? PERSONAL_PREFS : [GROUP_JOINED_PREF, ...PERSONAL_PREFS];
+  const visiblePrefs = isAdminAnywhere ? [...base, ...ADMIN_ONLY_PREFS] : base;
 
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

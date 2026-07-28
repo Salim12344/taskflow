@@ -3,18 +3,22 @@
 import { useEffect, useRef, useState, use as usePromise } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { api } from "@/lib/api-client";
+import { api, uploadFile, type Attachment } from "@/lib/api-client";
 import { groupIcon } from "@/lib/group-icon";
 import { Avatar } from "@/components/Avatar";
+import { AttachmentView } from "@/components/AttachmentView";
+import { useVoiceRecorder } from "@/lib/use-voice-recorder";
 import { isOnline, formatLastSeen } from "@/lib/presence";
 
 type Group = { _id: string; name: string };
 type Project = { _id: string; name: string; description: string; status: string };
 type Member = { _id: string; userId: { _id: string; name: string; email: string; avatarUrl: string | null; lastActiveAt: string | null }; role: "admin" | "member" };
 type ReadReceipt = { userId: { _id: string; name: string; avatarUrl: string | null }; readAt: string };
+type ReplyTo = { messageId: string; text: string; senderName: string };
 type GroupMessage = {
   _id: string; text: string; senderId: { _id: string; name: string; avatarUrl: string | null } | string;
   createdAt: string; isSystemMessage?: boolean; readBy: ReadReceipt[]; mentions: { _id: string; name: string }[];
+  replyTo: ReplyTo | null; attachments: Attachment[];
 };
 
 function renderWithMentions(text: string, mentions: { _id: string; name: string }[]) {
@@ -50,8 +54,12 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionMap, setMentionMap] = useState<Record<string, string>>({}); // name -> userId
   const [typingUsers, setTypingUsers] = useState<{ _id: string; name: string }[]>([]);
+  const [replyingTo, setReplyingTo] = useState<{ _id: string; text: string; senderName: string } | null>(null);
+  const [sendingAttachment, setSendingAttachment] = useState(false);
+  const voice = useVoiceRecorder();
   const chatEndRef = useRef<HTMLDivElement>(null);
   const lastTypingPingRef = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function loadAll() {
     api<{ group: Group; showOnboarding: boolean }>(`/api/groups/${groupId}`)
@@ -144,12 +152,45 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     setComposer("");
     setMentionMap({});
     setMentionQuery(null);
+    const replyToId = replyingTo?._id;
+    setReplyingTo(null);
     try {
-      await api(`/api/groups/${groupId}/messages`, { method: "POST", body: JSON.stringify({ text, mentions: mentionIds }) });
+      await api(`/api/groups/${groupId}/messages`, { method: "POST", body: JSON.stringify({ text, mentions: mentionIds, replyToId }) });
       loadMessages();
     } catch (e) {
       setError((e as Error).message);
     }
+  }
+
+  async function sendAttachment(file: Blob, filename: string) {
+    setSendingAttachment(true);
+    const replyToId = replyingTo?._id;
+    setReplyingTo(null);
+    try {
+      const attachment = await uploadFile(file, filename);
+      await api(`/api/groups/${groupId}/messages`, { method: "POST", body: JSON.stringify({ text: "", attachments: [attachment], replyToId }) });
+      loadMessages();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSendingAttachment(false);
+    }
+  }
+
+  async function startVoicePress() {
+    if (!voice.recording) await voice.start();
+  }
+
+  async function endVoicePress() {
+    if (!voice.recording) return;
+    const blob = await voice.stop();
+    if (blob && blob.size > 0) await sendAttachment(blob, `voice-note.${blob.type.includes("mp4") ? "m4a" : "webm"}`);
+  }
+
+  function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) sendAttachment(file, file.name);
   }
 
   function onComposerChange(value: string) {
@@ -266,24 +307,40 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                 );
               }
               return (
-                <div key={m._id} style={{ display: "flex", gap: 8, alignSelf: mine ? "flex-end" : "flex-start", flexDirection: mine ? "row-reverse" : "row", maxWidth: "58%" }}>
+                <div key={m._id} className="row-hover" style={{ display: "flex", gap: 8, alignSelf: mine ? "flex-end" : "flex-start", flexDirection: mine ? "row-reverse" : "row", maxWidth: "58%" }}>
                   {!mine && <Avatar name={senderName} avatarUrl={senderAvatar} size={26} />}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start" }}>
                     <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--color-text) 55%, transparent)", marginBottom: 3, padding: "0 2px" }}>
                       {senderName} · {new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                     </div>
-                    <div
-                      style={{
-                        padding: "9px 13px",
-                        borderRadius: 14,
-                        fontSize: 14,
-                        lineHeight: 1.4,
-                        background: mine ? "var(--color-accent)" : iAmMentioned ? "var(--color-amber-bg)" : "var(--color-surface)",
-                        color: mine ? "var(--color-bg)" : "var(--color-text)",
-                        border: iAmMentioned ? "1px solid var(--color-amber)" : "1px solid transparent",
-                      }}
-                    >
-                      {renderWithMentions(m.text, m.mentions)}
+                    <div style={{ display: "flex", gap: 4, alignItems: "flex-end", flexDirection: mine ? "row-reverse" : "row" }}>
+                      <div
+                        style={{
+                          padding: "9px 13px",
+                          borderRadius: 14,
+                          fontSize: 14,
+                          lineHeight: 1.4,
+                          background: mine ? "var(--color-accent)" : iAmMentioned ? "var(--color-amber-bg)" : "var(--color-surface)",
+                          color: mine ? "var(--color-bg)" : "var(--color-text)",
+                          border: iAmMentioned ? "1px solid var(--color-amber)" : "1px solid transparent",
+                        }}
+                      >
+                        {m.replyTo && (
+                          <div style={{ borderLeft: "2px solid currentColor", opacity: 0.7, paddingLeft: 8, marginBottom: 5, fontSize: 12.5 }}>
+                            <div style={{ fontWeight: 600 }}>{m.replyTo.senderName}</div>
+                            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{m.replyTo.text}</div>
+                          </div>
+                        )}
+                        {m.attachments?.map((a, i) => <div key={i} style={{ marginBottom: m.text ? 6 : 0 }}><AttachmentView attachment={a} mine={mine} /></div>)}
+                        {m.text && renderWithMentions(m.text, m.mentions)}
+                      </div>
+                      <button
+                        onClick={() => setReplyingTo({ _id: m._id, text: m.text || "📎 Attachment", senderName })}
+                        title="Reply"
+                        style={{ background: "none", border: "none", cursor: "pointer", padding: 4, opacity: 0.55, flex: "none" }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17l-5-5 5-5M4 12h10a5 5 0 015 5v2" /></svg>
+                      </button>
                     </div>
                     {mine && m.readBy.length > 0 && (
                       <button
@@ -302,6 +359,15 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
           {typingUsers.length > 0 && (
             <div style={{ fontSize: 12, fontStyle: "italic", color: "color-mix(in srgb, var(--color-text) 50%, transparent)", padding: "2px 4px" }}>
               {typingUsers.map((t) => t.name).join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing…
+            </div>
+          )}
+          {replyingTo && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", marginTop: 10, background: "var(--color-bg)", borderRadius: 8, borderLeft: "3px solid var(--color-accent)" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 600 }}>Replying to {replyingTo.senderName}</div>
+                <div style={{ fontSize: 12, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
+              </div>
+              <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
             </div>
           )}
           <form onSubmit={sendMessage} style={{ display: "flex", gap: 8, marginTop: 10, position: "relative" }}>
@@ -323,11 +389,39 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                   ))}
               </div>
             )}
-            <input className="input" placeholder={`Message ${group?.name ?? "group"}… (@ to mention)`} value={composer} onChange={(e) => onComposerChange(e.target.value)} style={{ flex: 1 }} />
-            <button className="btn btn-primary btn-icon" type="submit">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
+            <input ref={fileInputRef} type="file" onChange={onFilePicked} style={{ display: "none" }} />
+            <button type="button" className="btn btn-secondary btn-icon" disabled={sendingAttachment || voice.recording} onClick={() => fileInputRef.current?.click()} title="Attach a file">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
             </button>
+            <input
+              className="input"
+              placeholder={voice.recording ? "Recording…" : `Message ${group?.name ?? "group"}… (@ to mention)`}
+              value={composer}
+              disabled={voice.recording}
+              onChange={(e) => onComposerChange(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            {composer.trim() ? (
+              <button className="btn btn-primary btn-icon" type="submit">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-icon"
+                disabled={sendingAttachment}
+                onPointerDown={startVoicePress}
+                onPointerUp={endVoicePress}
+                onPointerLeave={endVoicePress}
+                onPointerCancel={endVoicePress}
+                title="Hold to record a voice note"
+                style={{ background: voice.recording ? "oklch(60% 0.2 25)" : "var(--color-accent)", color: "var(--color-bg)", touchAction: "none" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg>
+              </button>
+            )}
           </form>
+          {voice.error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 12, marginTop: 4 }}>{voice.error}</div>}
         </div>
       )}
 
