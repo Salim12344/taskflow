@@ -150,9 +150,9 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
               <div style={{ display: "flex", gap: 4, alignItems: "flex-end", flexDirection: mine ? "row-reverse" : "row" }}>
                 <div style={{ padding: "9px 13px", borderRadius: 14, fontSize: 14, lineHeight: 1.4, background: mine ? "var(--color-accent)" : "var(--color-surface)", color: mine ? "var(--color-bg)" : "var(--color-text)" }}>
                   {m.replyTo && (
-                    <div style={{ borderLeft: "2px solid currentColor", opacity: 0.7, paddingLeft: 8, marginBottom: 5, fontSize: 12.5 }}>
-                      <div style={{ fontWeight: 600 }}>{m.replyTo.senderName}</div>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{m.replyTo.text}</div>
+                    <div style={{ borderLeft: "2px solid currentColor", background: "color-mix(in srgb, currentColor 14%, transparent)", borderRadius: 6, padding: "4px 8px", marginBottom: 6, fontSize: 12.5 }}>
+                      <div style={{ fontWeight: 600, opacity: 0.9 }}>{m.replyTo.senderName}</div>
+                      <div style={{ opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{m.replyTo.text}</div>
                     </div>
                   )}
                   {m.attachments?.map((a, i) => <div key={i} style={{ marginBottom: m.text ? 6 : 0 }}><AttachmentView attachment={a} mine={mine} /></div>)}
