@@ -33,7 +33,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100dvh", width: "100%", overflow: "hidden" }}>
       <div className={`app-sidebar ${mobileOpen ? "open" : ""}`}>
         <Sidebar open={mobileOpen} onNavigate={() => setMobileOpen(false)} />
       </div>

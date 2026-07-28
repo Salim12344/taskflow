@@ -73,7 +73,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
   if (replyToId) {
     const target = await TaskChatMessage.findOne({ _id: replyToId, taskId }).populate("senderId", "name");
     if (target) {
-      replyTo = { messageId: target._id, text: target.text, senderName: (target.senderId as unknown as { name: string }).name };
+      replyTo = { messageId: target._id, text: target.text || "📎 Attachment", senderName: (target.senderId as unknown as { name: string }).name };
     }
   }
 

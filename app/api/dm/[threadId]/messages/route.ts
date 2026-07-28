@@ -51,7 +51,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ threadI
   if (replyToId) {
     const target = await DMMessage.findOne({ _id: replyToId, threadId }).populate("senderId", "name");
     if (target) {
-      replyTo = { messageId: target._id, text: target.text, senderName: (target.senderId as unknown as { name: string }).name };
+      replyTo = { messageId: target._id, text: target.text || "📎 Attachment", senderName: (target.senderId as unknown as { name: string }).name };
     }
   }
 

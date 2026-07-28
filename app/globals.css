@@ -163,7 +163,7 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; margin: 0; }
 .table-wrap { width: 100%; overflow-x: auto; }
 
 .mobile-topbar { display: none; }
-.app-sidebar { flex: none; height: 100vh; }
+.app-sidebar { flex: none; height: 100vh; height: 100dvh; }
 .kanban-mobile-filter { display: none; }
 
 @media (max-width: 860px) {

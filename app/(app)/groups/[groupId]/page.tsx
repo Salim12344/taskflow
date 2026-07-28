@@ -290,7 +290,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
       )}
 
       {tab === "chat" && (
-        <div className="page-pad" style={{ padding: "0 40px 40px", display: "flex", flexDirection: "column", height: "calc(100vh - 260px)", minHeight: 360 }}>
+        <div className="page-pad" style={{ padding: "0 40px 40px", display: "flex", flexDirection: "column", height: "calc(100dvh - 260px)", minHeight: 360 }}>
           <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, padding: "6px 0" }}>
             {messages.length === 0 && <div className="card-meta">No messages yet. Say hello.</div>}
             {messages.map((m) => {

@@ -3,7 +3,8 @@ import mongoose, { Schema, models, model } from "mongoose";
 const TaskChatMessageSchema = new Schema({
   taskId: { type: Schema.Types.ObjectId, ref: "Task", required: true },
   senderId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-  text: { type: String, required: true },
+  // Not required: an attachment-only message (voice note, photo) has no text at all.
+  text: { type: String, default: "" },
   attachments: [
     {
       url: { type: String, required: true },

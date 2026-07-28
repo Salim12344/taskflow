@@ -102,7 +102,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
         flexDirection: "column",
         background: "var(--color-surface)",
         borderRight: "1px solid var(--color-divider)",
-        height: "100vh",
+        height: "100dvh",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "18px 18px 14px" }}>
