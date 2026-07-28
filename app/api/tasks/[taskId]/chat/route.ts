@@ -23,7 +23,9 @@ async function loadChatContext(taskId: string, userId: string) {
   const isAssignee = task.assignedTo?.toString() === userId;
   const isManager = await canManageTask(task.reviewerId?.toString() ?? null, orgId, userId, task.createdBy.toString() === userId);
   const canRead = admin || isAssignee;
-  const canWrite = isAssignee || (admin && isManager);
+  // Once a task is approved it's a closed record — the thread stays readable but nobody can
+  // post to it anymore, regardless of who they were to the task.
+  const canWrite = task.status !== "done" && (isAssignee || (admin && isManager));
 
   return { task, canRead, canWrite, isAssignee, isManager };
 }

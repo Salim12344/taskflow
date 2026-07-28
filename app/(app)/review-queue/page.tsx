@@ -10,22 +10,36 @@ type Section = {
   tasks: { taskId: string; title: string; projectName: string; submittedAt: string | null }[];
 };
 
+const STATUS_OPTIONS = [
+  { value: "pending_review", label: "Pending review" },
+  { value: "todo", label: "To do" },
+  { value: "in_progress", label: "In progress" },
+  { value: "done", label: "Done" },
+];
+
 export default function ReviewQueuePage() {
   const router = useRouter();
+  const [status, setStatus] = useState("pending_review");
   const [sections, setSections] = useState<Section[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api<{ sections: Section[] }>("/api/review-queue")
+    setSections(null);
+    api<{ sections: Section[] }>(`/api/review-queue?status=${status}`)
       .then((d) => setSections(d.sections))
       .catch((e) => setError(e.message));
-  }, []);
+  }, [status]);
 
   return (
     <div className="tf-fade page-pad" style={{ padding: "32px 40px 40px", maxWidth: 1200 }}>
-      <h2 style={{ marginBottom: 20 }}>Review queue</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+        <h2>Tasks — {STATUS_OPTIONS.find((o) => o.value === status)?.label}</h2>
+        <select className="input" style={{ width: "auto" }} value={status} onChange={(e) => setStatus(e.target.value)}>
+          {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
       {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13 }}>{error}</div>}
-      {sections?.length === 0 && <div className="card-meta">Nothing waiting on review.</div>}
+      {sections?.length === 0 && <div className="card-meta">Nothing here.</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {sections?.map((s) => (
           <div key={s.groupId}>

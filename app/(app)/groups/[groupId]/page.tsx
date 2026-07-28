@@ -386,9 +386,9 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
       {seenByModal && (
         <div
           onClick={() => setSeenByModal(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
         >
-          <div onClick={(e) => e.stopPropagation()} className="card elev-sm" style={{ width: 320, maxHeight: "70vh", overflowY: "auto" }}>
+          <div onClick={(e) => e.stopPropagation()} className="card elev-sm" style={{ width: 320, maxWidth: "100%", maxHeight: "70vh", overflowY: "auto" }}>
             <div className="card-title">Seen by</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {seenByModal.map((r) => (

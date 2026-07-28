@@ -137,7 +137,7 @@ export default function SettingsPage() {
               <span style={{ fontSize: 13 }}>{label}</span>
               <input
                 type="checkbox"
-                checked={prefs[i]}
+                checked={prefs[i] ?? true}
                 onChange={() => setPrefs((p) => p.map((v, idx) => (idx === i ? !v : v)))}
                 style={{ width: "auto", accentColor: "var(--color-accent)" }}
               />

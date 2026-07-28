@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { connectDB } from "@/lib/db";
 import Group from "@/models/Group";
@@ -7,9 +7,14 @@ import Organization from "@/models/Organization";
 import Project from "@/models/Project";
 import Task from "@/models/Task";
 
-export async function GET() {
+const VALID_STATUSES = ["todo", "in_progress", "pending_review", "done"];
+
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const statusParam = req.nextUrl.searchParams.get("status");
+  const status = VALID_STATUSES.includes(statusParam ?? "") ? statusParam! : "pending_review";
 
   await connectDB();
   const userId = session.user.id;
@@ -32,9 +37,9 @@ export async function GET() {
     const projectMap = new Map(projects.map((p) => [p._id.toString(), p.name]));
     const tasks = await Task.find({
       projectId: { $in: projects.map((p) => p._id) },
-      status: "pending_review",
+      status,
       deletedAt: null,
-    }).sort({ submittedAt: 1 });
+    }).sort(status === "pending_review" ? { submittedAt: 1 } : { createdAt: -1 });
 
     if (tasks.length === 0) continue;
 

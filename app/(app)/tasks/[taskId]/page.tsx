@@ -96,7 +96,8 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   // org owner, who always keeps an emergency fallback to act on the task).
   const isDesignatedManager = !!task?.reviewerId && task.reviewerId === userId;
   const canManage = task?.reviewerId ? isDesignatedManager || isOrgAccount : isCreator || isOrgAccount;
-  const canDelete = canManage;
+  // Once approved, a task is a closed record — nobody can delete it, manager or not.
+  const canDelete = canManage && task?.status !== "done";
   // Handing a task off reassigns who's accountable for it — narrower than canManage, so even
   // the org owner's emergency override doesn't extend to it, only the creator/current delegate.
   const canDelegate = isDesignatedManager || (!task?.reviewerId && isCreator);

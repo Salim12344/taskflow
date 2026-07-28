@@ -179,6 +179,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ task
   if (!ctx?.project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const { task, group } = ctx;
 
+  if (task.status === "done") {
+    return NextResponse.json({ error: "Approved tasks can't be deleted" }, { status: 400 });
+  }
+
   const orgId = group?.orgId?.toString() ?? null;
   const isCreator = task.createdBy.toString() === session.user.id;
   // Default manager is the creator, not any admin — once delegated, deletion rights move

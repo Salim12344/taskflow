@@ -30,8 +30,8 @@ export default function InviteRedeemPage({ params }: { params: Promise<{ token: 
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div className="card elev-sm" style={{ width: 400 }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div className="card elev-sm" style={{ width: "min(400px, 100%)" }}>
         {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13.5 }}>{error}</div>}
         {!error && !info && <div className="card-meta">Checking invite…</div>}
         {info && (

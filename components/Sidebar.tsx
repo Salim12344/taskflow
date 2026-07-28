@@ -143,7 +143,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
             ) : undefined
           }
         />
-        <NavRow href="/review-queue" label="Review queue" active={pathname === "/review-queue"} />
+        <NavRow href="/review-queue" label="Tasks by status" active={pathname === "/review-queue"} />
         {session?.user?.accountType === "organization" && (
           <NavRow href="/organization" label="Organization" active={pathname === "/organization"} />
         )}
