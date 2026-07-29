@@ -94,7 +94,11 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   }, [messages]);
 
   const me = members?.find((m) => m.userId._id === session?.user?.id);
-  const isAdmin = me?.role === "admin";
+  // Org owners are implicit admins of every group their org creates and never actually join
+  // as an explicit member — "leave" doesn't apply to them (server rejects it either way).
+  const isOrgAccount = session?.user?.accountType === "organization";
+  const isAdmin = isOrgAccount || me?.role === "admin";
+  const canLeave = !!me && !isOrgAccount;
 
   async function createProject(e: React.FormEvent) {
     e.preventDefault();
@@ -239,7 +243,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             {isAdmin && <button className="btn btn-primary" onClick={() => router.push(`/groups/${groupId}/invite`)}>Invite people</button>}
-            <button className="btn btn-secondary" onClick={leaveGroup}>Leave group</button>
+            {canLeave && <button className="btn btn-secondary" onClick={leaveGroup}>Leave group</button>}
           </div>
         </div>
         {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, margin: "8px 0" }}>{error}</div>}
