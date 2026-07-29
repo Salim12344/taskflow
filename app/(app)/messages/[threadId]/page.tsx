@@ -71,8 +71,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
+  async function sendMessage() {
     if (!composer.trim()) return;
     const text = composer;
     setComposer("");
@@ -185,7 +184,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
           <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
         </div>
       )}
-      <form onSubmit={sendMessage} style={{ display: "flex", gap: 8, marginTop: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <input ref={fileInputRef} type="file" onChange={onFilePicked} style={{ display: "none" }} />
         <button type="button" className="btn btn-secondary btn-icon" disabled={sendingAttachment || voice.recording} onClick={() => fileInputRef.current?.click()} title="Attach a file">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
@@ -196,10 +195,12 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
           value={composer}
           disabled={voice.recording}
           onChange={(e) => onComposerChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); } }}
+          autoComplete="off"
           style={{ flex: 1 }}
         />
         {composer.trim() ? (
-          <button className="btn btn-primary btn-icon" type="submit">
+          <button className="btn btn-primary btn-icon" type="button" onClick={sendMessage}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
           </button>
         ) : (
@@ -217,7 +218,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg>
           </button>
         )}
-      </form>
+      </div>
       {voice.error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 12, marginTop: 4 }}>{voice.error}</div>}
     </div>
   );

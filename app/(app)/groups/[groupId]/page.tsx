@@ -142,8 +142,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     }
   }
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
+  async function sendMessage() {
     if (!composer.trim()) return;
     const text = composer;
     const mentionIds = Object.entries(mentionMap)
@@ -370,7 +369,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
               <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
             </div>
           )}
-          <form onSubmit={sendMessage} style={{ display: "flex", gap: 8, marginTop: 10, position: "relative" }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 10, position: "relative" }}>
             {mentionQuery !== null && (
               <div className="card elev-sm" style={{ position: "absolute", bottom: "100%", left: 0, marginBottom: 6, width: 220, padding: 6, gap: 2, zIndex: 20 }}>
                 {members
@@ -399,10 +398,12 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
               value={composer}
               disabled={voice.recording}
               onChange={(e) => onComposerChange(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); } }}
+              autoComplete="off"
               style={{ flex: 1 }}
             />
             {composer.trim() ? (
-              <button className="btn btn-primary btn-icon" type="submit">
+              <button className="btn btn-primary btn-icon" type="button" onClick={sendMessage}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
               </button>
             ) : (
@@ -420,7 +421,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg>
               </button>
             )}
-          </form>
+          </div>
           {voice.error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 12, marginTop: 4 }}>{voice.error}</div>}
         </div>
       )}
