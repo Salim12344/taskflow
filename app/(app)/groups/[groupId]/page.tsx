@@ -442,7 +442,9 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                   <tr key={m._id} className="row-hover" style={{ cursor: "default" }}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <Avatar name={m.userId.name} avatarUrl={m.userId.avatarUrl} size={28} online={isOnline(m.userId.lastActiveAt)} />
+                        <div onClick={() => !isMe && messageMember(m.userId._id)} style={{ cursor: isMe ? "default" : "pointer" }} title={isMe ? undefined : "Message"}>
+                          <Avatar name={m.userId.name} avatarUrl={m.userId.avatarUrl} size={28} online={isOnline(m.userId.lastActiveAt)} />
+                        </div>
                         <div>
                           <div>{m.userId.name}</div>
                           <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{m.userId.email}</div>
