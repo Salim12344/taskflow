@@ -43,7 +43,10 @@ export async function POST(req: Request) {
   if (otherUserId === session.user.id) return NextResponse.json({ error: "Cannot DM yourself" }, { status: 400 });
 
   await connectDB();
-  if (!(await shareAGroup(session.user.id, otherUserId))) {
+  // Org owners can message anyone — they're the one role with no natural "shared group"
+  // boundary, since their oversight already spans every group under their org.
+  const isOrgOwner = session.user.accountType === "organization";
+  if (!isOrgOwner && !(await shareAGroup(session.user.id, otherUserId))) {
     return NextResponse.json({ error: "You can only message someone from a shared group's Members list" }, { status: 403 });
   }
 
