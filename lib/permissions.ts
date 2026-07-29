@@ -51,13 +51,25 @@ export async function isAssignableMember(groupId: string, userId: string) {
   return member?.role === "member";
 }
 
+/** All group IDs this user belongs to — explicit membership, plus every group under an org they own. */
+async function groupIdsFor(userId: string) {
+  await connectDB();
+  const explicit = await GroupMember.find({ userId }, "groupId");
+  const groupIds = new Set(explicit.map((g) => g.groupId.toString()));
+
+  const ownedOrgs = await Organization.find({ ownerId: userId }, "_id");
+  if (ownedOrgs.length) {
+    const orgGroups = await Group.find({ orgId: { $in: ownedOrgs.map((o) => o._id) }, deletedAt: null }, "_id");
+    orgGroups.forEach((g) => groupIds.add(g._id.toString()));
+  }
+  return groupIds;
+}
+
 /** DMs may only start between people who share at least one group (spec: no general "message anyone" search). */
 export async function shareAGroup(userIdA: string, userIdB: string) {
-  await connectDB();
-  const groupsA = await GroupMember.find({ userId: userIdA }, "groupId");
-  const groupsB = await GroupMember.find({ userId: userIdB }, "groupId");
-  const setB = new Set(groupsB.map((g) => g.groupId.toString()));
-  return groupsA.some((g) => setB.has(g.groupId.toString()));
+  const groupsA = await groupIdsFor(userIdA);
+  const groupsB = await groupIdsFor(userIdB);
+  return [...groupsA].some((id) => groupsB.has(id));
 }
 
 export async function countAdmins(groupId: string) {
