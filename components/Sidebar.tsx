@@ -71,13 +71,19 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
   }
 
   useEffect(loadGroups, [pathname]);
-  useEffect(loadDms, [pathname]);
   useEffect(loadMe, []);
   useEffect(onNavigate, [pathname]);
 
   useEffect(() => {
     loadNotifs();
     const interval = setInterval(loadNotifs, 20_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  useEffect(() => {
+    loadDms();
+    const interval = setInterval(loadDms, 5_000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
