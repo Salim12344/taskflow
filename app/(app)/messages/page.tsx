@@ -22,9 +22,14 @@ export default function MessagesInboxPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api<{ threads: Thread[] }>("/api/dm")
-      .then((d) => setThreads(d.threads))
-      .catch((e) => setError(e.message));
+    function load() {
+      api<{ threads: Thread[] }>("/api/dm")
+        .then((d) => setThreads(d.threads))
+        .catch((e) => setError(e.message));
+    }
+    load();
+    const interval = setInterval(load, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
