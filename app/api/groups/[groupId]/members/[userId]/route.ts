@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { auth } from "@/auth";
 import { connectDB } from "@/lib/db";
 import Group from "@/models/Group";
@@ -88,16 +89,35 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ grou
     return NextResponse.json({ error: "The organization owner can't be removed from a group they own" }, { status: 400 });
   }
 
-  if (target.role === "admin" && !(await hasAnotherAdmin(groupId, orgId, userId))) {
-    return NextResponse.json(
-      { error: "Promote another member to admin before leaving/stepping down" },
-      { status: 409 }
-    );
+  if (target.role === "admin") {
+    // Guard the count-check and the removal in one transaction — otherwise two concurrent
+    // removals of the last two admins can each see "another admin" (each other) and both
+    // proceed, leaving the group with zero admins.
+    const dbSession = await mongoose.startSession();
+    try {
+      await dbSession.withTransaction(async () => {
+        if (!(await hasAnotherAdmin(groupId, orgId, userId, dbSession))) {
+          throw new Error("NO_OTHER_ADMIN");
+        }
+        await GroupMember.deleteOne({ groupId, userId }).session(dbSession);
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === "NO_OTHER_ADMIN") {
+        return NextResponse.json(
+          { error: "Promote another member to admin before leaving/stepping down" },
+          { status: 409 }
+        );
+      }
+      throw e;
+    } finally {
+      await dbSession.endSession();
+    }
+  } else {
+    await GroupMember.deleteOne({ groupId, userId });
   }
 
   const tasksUnassigned = await unassignActiveTasks(groupId, userId);
   await clearDelegationsFor(groupId, userId);
-  await GroupMember.deleteOne({ groupId, userId });
   const removedUser = await User.findById(userId, "name");
   await logActivity(groupId, session.user.id, "member_removed", "user", userId, `${session.user.name} removed ${removedUser?.name ?? "a member"} from the group`);
 
@@ -130,12 +150,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ groupI
   }
 
   if (target.role === "admin" && role === "member") {
-    if (!(await hasAnotherAdmin(groupId, orgId, userId))) {
-      return NextResponse.json(
-        { error: "Promote another member to admin before leaving/stepping down" },
-        { status: 409 }
-      );
-    }
     // Pending-review block only applies to self-demotion (spec: admin stepping themselves down).
     if (userId === session.user.id) {
       const projectIds = await projectIdsFor(groupId);
@@ -168,10 +182,34 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ groupI
   }
 
   const oldRole = target.role;
-  target.role = role;
-  await target.save();
   if (oldRole === "admin" && role === "member") {
+    // Guard the admin-count check and the role flip in one transaction — otherwise two
+    // concurrent demotions can each see "another admin" (each other) and both proceed,
+    // leaving the group with zero admins.
+    const dbSession = await mongoose.startSession();
+    try {
+      await dbSession.withTransaction(async () => {
+        if (!(await hasAnotherAdmin(groupId, orgId, userId, dbSession))) {
+          throw new Error("NO_OTHER_ADMIN");
+        }
+        await GroupMember.updateOne({ _id: target._id }, { $set: { role } }).session(dbSession);
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === "NO_OTHER_ADMIN") {
+        return NextResponse.json(
+          { error: "Promote another member to admin before leaving/stepping down" },
+          { status: 409 }
+        );
+      }
+      throw e;
+    } finally {
+      await dbSession.endSession();
+    }
+    target.role = role;
     await clearDelegationsFor(groupId, userId);
+  } else {
+    target.role = role;
+    await target.save();
   }
   if (oldRole !== role) {
     const targetUser = await User.findById(userId, "name");

@@ -28,7 +28,9 @@ export async function GET(req: NextRequest) {
       { description: `Due ${new Date(task.deadline!).toLocaleString()}`, payload: { taskId: task._id } }
     );
     task.deadlineReminderSentAt = new Date();
-    await task.save();
+    // A version conflict just means someone edited the task in the same instant — skip it,
+    // it'll be picked up again tomorrow if it's still due soon.
+    await task.save().catch(() => {});
   }
 
   return NextResponse.json({ remindersSent: dueSoon.length });

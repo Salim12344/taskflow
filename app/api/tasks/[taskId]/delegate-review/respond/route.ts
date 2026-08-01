@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { notify } from "@/lib/notify";
 import { loadTaskContext } from "@/lib/task-context";
 import { isGroupAdmin } from "@/lib/permissions";
+import { saveTaskOrConflict } from "@/lib/task-save";
 
 export async function POST(req: Request, { params }: { params: Promise<{ taskId: string }> }) {
   const session = await auth();
@@ -24,7 +25,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
   // before they acted on it, they can no longer accept management they don't have rights to.
   if (accept && !(await isGroupAdmin(project.groupId.toString(), session.user.id, group?.orgId?.toString() ?? null))) {
     task.pendingReviewDelegation = null;
-    await task.save();
+    const withdrawConflict = await saveTaskOrConflict(task);
+    if (withdrawConflict) return withdrawConflict;
     return NextResponse.json({ error: "You're no longer an admin of this group — the offer has been withdrawn" }, { status: 403 });
   }
 
@@ -32,7 +34,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
   if (accept) {
     task.reviewerId = delegation.toUserId;
   }
-  await task.save();
+  const conflict = await saveTaskOrConflict(task);
+  if (conflict) return conflict;
 
   await notify(
     delegation.fromUserId.toString(),

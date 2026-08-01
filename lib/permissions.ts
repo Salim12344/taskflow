@@ -82,12 +82,12 @@ export async function countAdmins(groupId: string) {
  * Accounts for the org owner's implicit admin rights, not just explicit GroupMember rows —
  * countAdmins() alone under-counts a group whose owner never explicitly joined as a member.
  */
-export async function hasAnotherAdmin(groupId: string, orgId: string | null, userId: string) {
+export async function hasAnotherAdmin(groupId: string, orgId: string | null, userId: string, session?: import("mongoose").ClientSession) {
   await connectDB();
-  const otherExplicitAdmins = await GroupMember.countDocuments({ groupId, role: "admin", userId: { $ne: userId } });
+  const otherExplicitAdmins = await GroupMember.countDocuments({ groupId, role: "admin", userId: { $ne: userId } }).session(session ?? null);
   if (otherExplicitAdmins > 0) return true;
   if (orgId) {
-    const org = await Organization.findById(orgId);
+    const org = await Organization.findById(orgId).session(session ?? null);
     if (org && org.ownerId.toString() !== userId) return true;
   }
   return false;

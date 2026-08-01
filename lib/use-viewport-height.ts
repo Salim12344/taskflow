@@ -13,13 +13,18 @@ export function useViewportHeight() {
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
+    // iOS fires resize repeatedly mid-animation as the keyboard slides in/out — applying each
+    // intermediate value makes the layout visibly jump in steps. Debounce to the settled value.
+    let timer: ReturnType<typeof setTimeout>;
     function update() {
-      setHeight(vv!.height);
+      clearTimeout(timer);
+      timer = setTimeout(() => setHeight(vv!.height), 80);
     }
-    update();
+    setHeight(vv.height);
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
     return () => {
+      clearTimeout(timer);
       vv.removeEventListener("resize", update);
       vv.removeEventListener("scroll", update);
     };

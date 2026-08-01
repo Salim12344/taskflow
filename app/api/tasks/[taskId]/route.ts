@@ -10,6 +10,7 @@ import { isAssignableMember, isGroupAdmin, isGroupMember, canManageTask } from "
 import { nextDueDate } from "@/lib/recurrence";
 import { loadTaskContext } from "@/lib/task-context";
 import { logActivity } from "@/lib/activity";
+import { saveTaskOrConflict } from "@/lib/task-save";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   todo: ["in_progress"],
@@ -171,7 +172,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
     }
   }
 
-  await task.save();
+  const conflict = await saveTaskOrConflict(task);
+  if (conflict) return conflict;
   return NextResponse.json({ task });
 }
 
@@ -200,7 +202,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ task
   }
 
   task.deletedAt = new Date();
-  await task.save();
+  const conflict = await saveTaskOrConflict(task);
+  if (conflict) return conflict;
   await logActivity(group?._id?.toString() ?? "", session.user.id, "task_deleted", "task", task._id.toString(), `${session.user.name} deleted "${task.title}"`);
 
   return NextResponse.json({ ok: true });

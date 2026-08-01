@@ -50,6 +50,11 @@ const TaskSchema = new Schema({
   deletedAt: { type: Date, default: null },
   // Guards the deadline-reminder cron from notifying the same task twice.
   deadlineReminderSentAt: { type: Date, default: null },
+}, {
+  // Rejects a save() if the doc changed underneath it since it was loaded (not just on array
+  // edits, which is Mongoose's default) — prevents two concurrent edits from silently
+  // last-write-winning over each other.
+  optimisticConcurrency: true,
 });
 
 export type TaskDoc = mongoose.InferSchemaType<typeof TaskSchema> & { _id: mongoose.Types.ObjectId };

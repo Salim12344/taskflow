@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db";
 import Project from "@/models/Project";
 import Task from "@/models/Task";
 import { getActiveGroup, canManageTask } from "@/lib/permissions";
+import { saveTaskOrConflict } from "@/lib/task-save";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ taskId: string }> }) {
   const session = await auth();
@@ -29,7 +30,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
   if (!isAssignee && !isManager) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   task.subtasks[index].done = !!done;
-  await task.save();
+  const conflict = await saveTaskOrConflict(task);
+  if (conflict) return conflict;
 
   return NextResponse.json({ task });
 }
