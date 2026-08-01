@@ -7,6 +7,7 @@ export function useStickToBottom<T>(items: T[]) {
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
+  const prevLengthRef = useRef(items.length);
 
   function onScroll() {
     const el = containerRef.current;
@@ -15,8 +16,17 @@ export function useStickToBottom<T>(items: T[]) {
   }
 
   useEffect(() => {
-    if (isNearBottomRef.current) endRef.current?.scrollIntoView({ block: "end" });
-  }, [items]);
+    const grew = items.length > prevLengthRef.current;
+    prevLengthRef.current = items.length;
+    // Only content growth (a new message) should ever move the scroll position — a poll that
+    // just refreshes existing messages (read receipts, edits) must never touch it. Setting
+    // scrollTop directly (rather than scrollIntoView) keeps this to the chat pane itself,
+    // never an ancestor scroll container.
+    if (!grew || !isNearBottomRef.current) return;
+    const el = containerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
 
   return { containerRef, endRef, onScroll };
 }
