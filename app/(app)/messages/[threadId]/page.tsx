@@ -62,7 +62,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
   useEffect(() => {
     loadMessages();
     loadOther();
-    const interval = setInterval(() => { loadMessages(); loadOther(); }, 4000);
+    const interval = setInterval(() => { loadMessages(); loadOther(); }, 1500);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);

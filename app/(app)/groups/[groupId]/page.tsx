@@ -84,7 +84,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   useEffect(() => {
     if (tab !== "chat") return;
     loadMessages();
-    const interval = setInterval(loadMessages, 4000);
+    const interval = setInterval(loadMessages, 1500);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, groupId]);

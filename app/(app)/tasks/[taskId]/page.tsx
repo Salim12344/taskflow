@@ -79,7 +79,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
 
   useEffect(() => {
     loadChat();
-    const interval = setInterval(loadChat, 4000);
+    const interval = setInterval(loadChat, 1500);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
