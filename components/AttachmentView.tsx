@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { Attachment } from "@/lib/api-client";
 
 function formatSize(bytes: number) {
@@ -6,15 +7,77 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds)) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/** WhatsApp-style voice-note player — native <audio controls> renders as a browser-chrome
+ * widget that can't be recolored to sit inside a chat bubble, hence the custom transport. */
+function VoiceMessage({ src, mine }: { src: string; mine: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onTime = () => setProgress(audio.currentTime);
+    const onLoaded = () => setDuration(audio.duration);
+    const onEnd = () => { setPlaying(false); setProgress(0); };
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("loadedmetadata", onLoaded);
+    audio.addEventListener("ended", onEnd);
+    return () => {
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("loadedmetadata", onLoaded);
+      audio.removeEventListener("ended", onEnd);
+    };
+  }, []);
+
+  function toggle() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) audio.pause();
+    else audio.play();
+    setPlaying(!playing);
+  }
+
+  const fg = mine ? "var(--color-bg)" : "var(--color-text)";
+  const track = mine ? "color-mix(in srgb, var(--color-bg) 35%, transparent)" : "color-mix(in srgb, var(--color-text) 20%, transparent)";
+  const pct = duration ? Math.min(100, (progress / duration) * 100) : 0;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 180, color: fg }}>
+      <audio ref={audioRef} src={src} preload="metadata" style={{ display: "none" }} />
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={playing ? "Pause voice message" : "Play voice message"}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: fg, flex: "none", display: "flex" }}
+      >
+        {playing ? (
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+        ) : (
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+        )}
+      </button>
+      <div style={{ flex: 1, height: 3, borderRadius: 2, background: track, position: "relative" }}>
+        <div style={{ position: "absolute", inset: 0, width: `${pct}%`, borderRadius: 2, background: fg }} />
+      </div>
+      <div className="mono" style={{ fontSize: 10.5, opacity: 0.85, flex: "none" }}>
+        {formatDuration(playing || progress ? progress : duration)}
+      </div>
+    </div>
+  );
+}
+
 export function AttachmentView({ attachment, mine }: { attachment: Attachment; mine: boolean }) {
   if (attachment.type.startsWith("audio/")) {
-    return (
-      <audio
-        controls
-        src={attachment.url}
-        style={{ height: 34, maxWidth: 220, filter: mine ? "invert(1) grayscale(1) contrast(0.9)" : undefined }}
-      />
-    );
+    return <VoiceMessage src={attachment.url} mine={mine} />;
   }
 
   if (attachment.type.startsWith("image/")) {

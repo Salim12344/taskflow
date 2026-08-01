@@ -17,6 +17,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (status === "unauthenticated") router.replace("/login");
   }, [status, router]);
 
+  useEffect(() => {
+    document.body.classList.add("tf-app-shell");
+    return () => document.body.classList.remove("tf-app-shell");
+  }, []);
+
   // Presence heartbeat — any open authenticated tab pings every 30s so others can see you're online.
   useEffect(() => {
     if (status !== "authenticated") return;

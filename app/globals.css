@@ -69,6 +69,14 @@ body {
   font-family: var(--font-body);
 }
 
+/* The (app) shell manages its own internal scrolling (see AppLayout) — pinning the document
+   here means focusing a chat input on iOS can't also scroll the whole page to reveal it. */
+body.tf-app-shell {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing: -0.01em; margin: 0; }
 .mono { font-family: var(--font-mono); font-feature-settings: "tnum"; }
 
@@ -78,6 +86,15 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing:
 
 @keyframes tf-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .tf-fade { animation: tf-fade .2s ease; }
+
+@keyframes tf-msg-in { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.tf-msg-in { animation: tf-msg-in .22s cubic-bezier(.2, .8, .2, 1) both; }
+
+@keyframes tf-pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+.tf-pop { animation: tf-pop .18s cubic-bezier(.2, .8, .2, 1) both; }
+
+@keyframes tf-card-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.tf-card-in { animation: tf-card-in .3s cubic-bezier(.2, .8, .2, 1) both; }
 
 .card {
   position: relative;
@@ -142,7 +159,7 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing:
 .btn-primary:hover:not(:disabled) { box-shadow: 0 4px 16px color-mix(in srgb, var(--color-accent) 45%, transparent); }
 .btn-secondary { background: transparent; border: 1px solid var(--color-divider); color: var(--color-text); }
 .btn-secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--color-text) 6%, transparent); border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-divider)); }
-.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:active:not(:disabled) { transform: translateY(1px) scale(.98); }
 
 .tag { transition: background .12s ease, color .12s ease; }
 

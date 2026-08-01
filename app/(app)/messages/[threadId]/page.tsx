@@ -140,7 +140,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
           const mine = m.senderId === session?.user?.id;
           const isLastMine = mine && i === messages.length - 1;
           return (
-            <div key={m._id} className="row-hover" style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", maxWidth: "55%", alignSelf: mine ? "flex-end" : "flex-start" }}>
+            <div key={m._id} className="row-hover tf-msg-in" style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", maxWidth: "55%", alignSelf: mine ? "flex-end" : "flex-start" }}>
               <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--color-text) 55%, transparent)", marginBottom: 3, padding: "0 2px" }}>
                 {new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
               </div>

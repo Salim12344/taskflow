@@ -347,7 +347,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
               const mine = m.senderId === userId;
               const sender = members.find((mem) => mem.userId._id === m.senderId);
               return (
-                <div key={m._id} className="row-hover" style={{ display: "flex", gap: 8, alignSelf: mine ? "flex-end" : "flex-start", flexDirection: mine ? "row-reverse" : "row", maxWidth: "80%" }}>
+                <div key={m._id} className="row-hover tf-msg-in" style={{ display: "flex", gap: 8, alignSelf: mine ? "flex-end" : "flex-start", flexDirection: mine ? "row-reverse" : "row", maxWidth: "80%" }}>
                   {!mine && <Avatar name={sender?.userId.name ?? "?"} avatarUrl={sender?.userId.avatarUrl} size={24} />}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start" }}>
                     <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--color-text) 55%, transparent)", marginBottom: 3, padding: "0 2px" }}>
