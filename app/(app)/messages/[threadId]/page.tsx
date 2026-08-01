@@ -8,6 +8,7 @@ import { Avatar } from "@/components/Avatar";
 import { AttachmentView } from "@/components/AttachmentView";
 import { useVoiceRecorder } from "@/lib/use-voice-recorder";
 import { isOnline, formatLastSeen } from "@/lib/presence";
+import { onKeyActivate } from "@/lib/a11y";
 
 type ReplyTo = { messageId: string; text: string; senderName: string };
 type Message = { _id: string; text: string; senderId: string; createdAt: string; readAt: string | null; replyTo: ReplyTo | null; attachments: Attachment[] };
@@ -122,7 +123,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
 
   return (
     <div className="tf-fade page-pad" style={{ display: "flex", flexDirection: "column", height: "100%", padding: "24px 40px", minHeight: 0 }}>
-      <div onClick={() => router.push(backTarget)} className="back-link" style={{ marginBottom: 14, width: "fit-content" }}>
+      <div role="link" tabIndex={0} onClick={() => router.push(backTarget)} onKeyDown={onKeyActivate(() => router.push(backTarget))} className="back-link" style={{ marginBottom: 14, width: "fit-content" }}>
         ← {backLabel}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
@@ -160,6 +161,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
                 <button
                   onClick={() => setReplyingTo({ _id: m._id, text: m.text || "📎 Attachment" })}
                   title="Reply"
+                  aria-label={mine ? "Reply to your message" : `Reply to ${otherName ?? "message"}`}
                   style={{ background: "none", border: "none", cursor: "pointer", padding: 4, opacity: 0.55, flex: "none" }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17l-5-5 5-5M4 12h10a5 5 0 015 5v2" /></svg>
@@ -182,12 +184,12 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
             <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-accent-300)" }}>{replyingTo._id && messages.find((m) => m._id === replyingTo._id)?.senderId === session?.user?.id ? "yourself" : otherName}</div>
             <div style={{ fontSize: 12, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
           </div>
-          <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
+          <button onClick={() => setReplyingTo(null)} aria-label="Cancel reply" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
         </div>
       )}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <input ref={fileInputRef} type="file" onChange={onFilePicked} style={{ display: "none" }} />
-        <button type="button" className="btn btn-secondary btn-icon" disabled={sendingAttachment || voice.recording} onClick={() => fileInputRef.current?.click()} title="Attach a file">
+        <button type="button" className="btn btn-secondary btn-icon" disabled={sendingAttachment || voice.recording} onClick={() => fileInputRef.current?.click()} title="Attach a file" aria-label="Attach a file">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
         </button>
         <input
@@ -201,7 +203,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
           style={{ flex: 1 }}
         />
         {composer.trim() ? (
-          <button className="btn btn-primary btn-icon" type="button" onClick={sendMessage}>
+          <button className="btn btn-primary btn-icon" type="button" onClick={sendMessage} aria-label="Send message">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
           </button>
         ) : (
@@ -213,13 +215,17 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
             onPointerUp={endVoicePress}
             onPointerLeave={endVoicePress}
             onPointerCancel={endVoicePress}
+            onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); startVoicePress(); } }}
+            onKeyUp={(e) => { if (e.key === "Enter" || e.key === " ") endVoicePress(); }}
             title="Hold to record a voice note"
+            aria-label="Hold to record a voice note"
             style={{ background: voice.recording ? "oklch(60% 0.2 25)" : "var(--color-accent)", color: "var(--color-bg)", touchAction: "none" }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg>
           </button>
         )}
       </div>
+      {sendingAttachment && <div className="card-meta" style={{ marginTop: 4 }}>Uploading…</div>}
       {voice.error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 12, marginTop: 4 }}>{voice.error}</div>}
     </div>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useState, use as usePromise } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
+import { onKeyActivate } from "@/lib/a11y";
 
 type Project = { _id: string; name: string; groupId: string };
 type Member = { userId: { _id: string; name: string }; role: "admin" | "member" };
@@ -50,7 +51,7 @@ export default function NewTaskPage({ params }: { params: Promise<{ projectId: s
 
   return (
     <div className="tf-fade page-pad" style={{ padding: "24px 40px 40px", minHeight: "100%", display: "flex", flexDirection: "column" }}>
-      <div onClick={() => router.push(`/projects/${projectId}`)} className="back-link" style={{ marginBottom: 18, width: "fit-content" }}>
+      <div role="link" tabIndex={0} onClick={() => router.push(`/projects/${projectId}`)} onKeyDown={onKeyActivate(() => router.push(`/projects/${projectId}`))} className="back-link" style={{ marginBottom: 18, width: "fit-content" }}>
         ← {project?.name ?? "Back"}
       </div>
       <h2 style={{ marginBottom: 18 }}>New task</h2>

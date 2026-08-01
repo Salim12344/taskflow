@@ -8,6 +8,8 @@ import { Avatar } from "@/components/Avatar";
 import { AttachmentView } from "@/components/AttachmentView";
 import { useVoiceRecorder } from "@/lib/use-voice-recorder";
 import { statusColorVar } from "@/lib/status";
+import { onKeyActivate } from "@/lib/a11y";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Task = {
   _id: string;
@@ -52,6 +54,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   const [composer, setComposer] = useState("");
   const [replyingTo, setReplyingTo] = useState<{ _id: string; text: string; senderName: string } | null>(null);
   const [sendingAttachment, setSendingAttachment] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const voice = useVoiceRecorder();
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -133,7 +136,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   }
 
   async function deleteTask() {
-    if (!confirm("Delete this task?")) return;
+    setConfirmDelete(false);
     try {
       await api(`/api/tasks/${taskId}`, { method: "DELETE" });
       router.push(`/projects/${task?.projectId}`);
@@ -222,7 +225,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
 
   return (
     <div className="tf-fade page-pad" style={{ padding: "24px 40px 40px" }}>
-      <div onClick={() => router.push(`/projects/${task.projectId}`)} className="back-link" style={{ marginBottom: 14 }}>
+      <div role="link" tabIndex={0} onClick={() => router.push(`/projects/${task.projectId}`)} onKeyDown={onKeyActivate(() => router.push(`/projects/${task.projectId}`))} className="back-link" style={{ marginBottom: 14 }}>
         ← {project?.name ?? "Back"}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
@@ -324,7 +327,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                 <button className="btn btn-secondary" style={{ color: "var(--color-accent-300)" }} onClick={() => setShowReject((s) => !s)}>Reject</button>
               </>
             )}
-            {canDelete && <button className="btn btn-secondary" style={{ color: "var(--color-accent-300)" }} onClick={deleteTask}>Delete task</button>}
+            {canDelete && <button className="btn btn-secondary" style={{ color: "var(--color-accent-300)" }} onClick={() => setConfirmDelete(true)}>Delete task</button>}
           </div>
 
           {showReject && (
@@ -353,7 +356,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                       {sender?.userId.name ?? "—"} · {new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                     </div>
                     <div style={{ display: "flex", gap: 4, alignItems: "flex-end", flexDirection: mine ? "row-reverse" : "row" }}>
-                      <div style={{ padding: "8px 12px", borderRadius: 12, fontSize: 13.5, lineHeight: 1.4, background: mine ? "var(--color-accent)" : "var(--color-bg)", color: mine ? "var(--color-bg)" : "var(--color-text)" }}>
+                      <div style={{ padding: "9px 13px", borderRadius: 14, fontSize: 14, lineHeight: 1.4, background: mine ? "var(--color-accent)" : "var(--color-bg)", color: mine ? "var(--color-bg)" : "var(--color-text)" }}>
                         {m.replyTo && (
                           <div style={{ borderLeft: "2px solid currentColor", background: "color-mix(in srgb, currentColor 14%, transparent)", borderRadius: 6, padding: "4px 8px", marginBottom: 6, fontSize: 12 }}>
                             <div style={{ fontWeight: 600, opacity: 0.9 }}>{m.replyTo.senderName}</div>
@@ -367,6 +370,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                         <button
                           onClick={() => setReplyingTo({ _id: m._id, text: m.text || "📎 Attachment", senderName: sender?.userId.name ?? "—" })}
                           title="Reply"
+                          aria-label={`Reply to ${sender?.userId.name ?? "message"}`}
                           style={{ background: "none", border: "none", cursor: "pointer", padding: 4, opacity: 0.55, flex: "none" }}
                         >
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17l-5-5 5-5M4 12h10a5 5 0 015 5v2" /></svg>
@@ -386,13 +390,13 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-accent-300)" }}>{replyingTo.senderName}</div>
                 <div style={{ fontSize: 12, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
               </div>
-              <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
+              <button onClick={() => setReplyingTo(null)} aria-label="Cancel reply" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
             </div>
           )}
           {chatCanWrite && (
             <div style={{ display: "flex", gap: 8 }}>
               <input ref={fileInputRef} type="file" onChange={onFilePicked} style={{ display: "none" }} />
-              <button type="button" className="btn btn-secondary btn-icon" disabled={sendingAttachment || voice.recording} onClick={() => fileInputRef.current?.click()} title="Attach a file">
+              <button type="button" className="btn btn-secondary btn-icon" disabled={sendingAttachment || voice.recording} onClick={() => fileInputRef.current?.click()} title="Attach a file" aria-label="Attach a file">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
               </button>
               <input
@@ -405,7 +409,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                 autoComplete="off"
               />
               {composer.trim() ? (
-                <button className="btn btn-primary btn-icon" type="button" onClick={sendChatMessage}>
+                <button className="btn btn-primary btn-icon" type="button" onClick={sendChatMessage} aria-label="Send message">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
                 </button>
               ) : (
@@ -417,7 +421,10 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                   onPointerUp={endVoicePress}
                   onPointerLeave={endVoicePress}
                   onPointerCancel={endVoicePress}
+                  onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); startVoicePress(); } }}
+                  onKeyUp={(e) => { if (e.key === "Enter" || e.key === " ") endVoicePress(); }}
                   title="Hold to record a voice note"
+                  aria-label="Hold to record a voice note"
                   style={{ background: voice.recording ? "oklch(60% 0.2 25)" : "var(--color-accent)", color: "var(--color-bg)", touchAction: "none" }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg>
@@ -425,9 +432,21 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
               )}
             </div>
           )}
+          {chatCanWrite && sendingAttachment && <div className="card-meta" style={{ marginTop: 4 }}>Uploading…</div>}
           {chatCanWrite && voice.error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 12, marginTop: 4 }}>{voice.error}</div>}
         </div>
       </div>
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete task"
+          description={`"${task.title}" and its full history will be gone for good. This can't be undone.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={deleteTask}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

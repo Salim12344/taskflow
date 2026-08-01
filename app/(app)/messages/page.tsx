@@ -7,6 +7,7 @@ import { api } from "@/lib/api-client";
 import { Avatar } from "@/components/Avatar";
 import { isOnline, formatLastSeen } from "@/lib/presence";
 import { formatChatListTimestamp } from "@/lib/format-time";
+import { onKeyActivate } from "@/lib/a11y";
 
 type Thread = {
   threadId: string;
@@ -44,8 +45,11 @@ export default function MessagesInboxPage() {
           return (
             <div
               key={t.threadId}
+              role="button"
+              tabIndex={0}
               className="row-hover"
               onClick={() => router.push(`/messages/${t.threadId}?from=inbox`)}
+              onKeyDown={onKeyActivate(() => router.push(`/messages/${t.threadId}?from=inbox`))}
               style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", borderBottom: "1px solid var(--color-divider)" }}
             >
               <Avatar name={t.other?.name ?? "?"} avatarUrl={t.other?.avatarUrl} size={42} fontSize={13} online={isOnline(t.other?.lastActiveAt ?? null)} />

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { statusColorVar } from "@/lib/status";
+import { onKeyActivate } from "@/lib/a11y";
 
 type Section = {
   groupId: string;
@@ -86,7 +87,10 @@ export default function ReviewQueuePage() {
               {s.tasks.map((t) => (
                 <div
                   key={t.taskId}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => router.push(`/tasks/${t.taskId}`)}
+                  onKeyDown={onKeyActivate(() => router.push(`/tasks/${t.taskId}`))}
                   className="row-hover"
                   style={{ display: "flex", justifyContent: "space-between", padding: "10px 12px", margin: "0 -12px", borderRadius: 8, borderBottom: "1px solid var(--color-divider)" }}
                 >

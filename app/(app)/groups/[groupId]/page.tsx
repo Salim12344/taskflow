@@ -9,6 +9,8 @@ import { Avatar } from "@/components/Avatar";
 import { AttachmentView } from "@/components/AttachmentView";
 import { useVoiceRecorder } from "@/lib/use-voice-recorder";
 import { isOnline, formatLastSeen } from "@/lib/presence";
+import { onKeyActivate } from "@/lib/a11y";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Group = { _id: string; name: string };
 type Project = { _id: string; name: string; description: string; status: string };
@@ -63,10 +65,23 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   const [typingUsers, setTypingUsers] = useState<{ _id: string; name: string }[]>([]);
   const [replyingTo, setReplyingTo] = useState<{ _id: string; text: string; senderName: string } | null>(null);
   const [sendingAttachment, setSendingAttachment] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<Member | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const voice = useVoiceRecorder();
   const chatEndRef = useRef<HTMLDivElement>(null);
   const lastTypingPingRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const seenByCloseRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!seenByModal) return;
+    seenByCloseRef.current?.focus();
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setSeenByModal(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [seenByModal]);
 
   function loadAll() {
     api<{ group: Group; showOnboarding: boolean }>(`/api/groups/${groupId}`)
@@ -141,7 +156,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   }
 
   async function removeMember(m: Member) {
-    if (!confirm(`Remove ${m.userId.name} from the group?`)) return;
+    setConfirmRemove(null);
     try {
       await api(`/api/groups/${groupId}/members/${m.userId._id}`, { method: "DELETE" });
       loadAll();
@@ -151,7 +166,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   }
 
   async function leaveGroup() {
-    if (!confirm(`Leave ${group?.name}?`)) return;
+    setConfirmLeave(false);
     try {
       await api(`/api/groups/${groupId}/leave`, { method: "POST" });
       router.push("/dashboard");
@@ -243,7 +258,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   return (
     <div>
       <div className="tf-fade page-pad" style={{ padding: "24px 40px 0" }}>
-        <div onClick={() => router.push("/dashboard")} className="back-link" style={{ marginBottom: 14 }}>
+        <div role="link" tabIndex={0} onClick={() => router.push("/dashboard")} onKeyDown={onKeyActivate(() => router.push("/dashboard"))} className="back-link" style={{ marginBottom: 14 }}>
           ← Dashboard
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2, flexWrap: "wrap", gap: 12 }}>
@@ -257,7 +272,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             {isAdmin && <button className="btn btn-primary" onClick={() => router.push(`/groups/${groupId}/invite`)}>Invite people</button>}
-            {canLeave && <button className="btn btn-secondary" onClick={leaveGroup}>Leave group</button>}
+            {canLeave && <button className="btn btn-secondary" onClick={() => setConfirmLeave(true)}>Leave group</button>}
           </div>
         </div>
         {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, margin: "8px 0" }}>{error}</div>}
@@ -270,11 +285,25 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
           </div>
         )}
 
-        <div style={{ display: "inline-flex", border: "1px solid var(--color-divider)", borderRadius: 8, overflow: "hidden", margin: "22px 0" }}>
-          <div onClick={() => setTab("projects")} className={`tab-btn ${tab === "projects" ? "tab-active" : ""}`} style={{ background: tab === "projects" ? "var(--color-accent)" : "transparent", color: tab === "projects" ? "var(--color-bg)" : "inherit" }}>Projects</div>
-          <div onClick={() => setTab("chat")} className={`tab-btn ${tab === "chat" ? "tab-active" : ""}`} style={{ borderLeft: "1px solid var(--color-divider)", background: tab === "chat" ? "var(--color-accent)" : "transparent", color: tab === "chat" ? "var(--color-bg)" : "inherit" }}>Chat</div>
-          <div onClick={() => setTab("members")} className={`tab-btn ${tab === "members" ? "tab-active" : ""}`} style={{ borderLeft: "1px solid var(--color-divider)", background: tab === "members" ? "var(--color-accent)" : "transparent", color: tab === "members" ? "var(--color-bg)" : "inherit" }}>Members</div>
-          {isAdmin && <div onClick={() => setTab("activity")} className={`tab-btn ${tab === "activity" ? "tab-active" : ""}`} style={{ borderLeft: "1px solid var(--color-divider)", background: tab === "activity" ? "var(--color-accent)" : "transparent", color: tab === "activity" ? "var(--color-bg)" : "inherit" }}>Activity</div>}
+        <div role="tablist" aria-label="Group sections" style={{ display: "inline-flex", border: "1px solid var(--color-divider)", borderRadius: 8, overflow: "hidden", margin: "22px 0" }}>
+          {([
+            ["projects", "Projects"],
+            ["chat", "Chat"],
+            ["members", "Members"],
+            ...(isAdmin ? [["activity", "Activity"] as const] : []),
+          ] as const).map(([key, label], i) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => setTab(key)}
+              className={`tab-btn ${tab === key ? "tab-active" : ""}`}
+              style={{ borderLeft: i > 0 ? "1px solid var(--color-divider)" : "none", background: tab === key ? "var(--color-accent)" : "transparent", color: tab === key ? "var(--color-bg)" : "inherit" }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -294,7 +323,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
           )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 16 }}>
             {projects?.map((p) => (
-              <div key={p._id} className="card elev-sm card-clickable" onClick={() => router.push(`/projects/${p._id}`)}>
+              <div key={p._id} role="button" tabIndex={0} className="card elev-sm card-clickable" onClick={() => router.push(`/projects/${p._id}`)} onKeyDown={onKeyActivate(() => router.push(`/projects/${p._id}`))}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                   <div className="card-title">{p.name}</div>
                   <span className="tag tag-accent">{p.status}</span>
@@ -355,6 +384,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                       <button
                         onClick={() => setReplyingTo({ _id: m._id, text: m.text || "📎 Attachment", senderName })}
                         title="Reply"
+                        aria-label={`Reply to ${senderName}`}
                         style={{ background: "none", border: "none", cursor: "pointer", padding: 4, opacity: 0.55, flex: "none" }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17l-5-5 5-5M4 12h10a5 5 0 015 5v2" /></svg>
@@ -386,7 +416,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-accent-300)" }}>{replyingTo.senderName}</div>
                 <div style={{ fontSize: 12, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
               </div>
-              <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
+              <button onClick={() => setReplyingTo(null)} aria-label="Cancel reply" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
             </div>
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 10, position: "relative" }}>
@@ -398,8 +428,12 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                   .map((m) => (
                     <div
                       key={m.userId._id}
+                      role="option"
+                      aria-selected={false}
+                      tabIndex={0}
                       className="row-hover"
                       onClick={() => pickMention(m.userId.name, m.userId._id)}
+                      onKeyDown={onKeyActivate(() => pickMention(m.userId.name, m.userId._id))}
                       style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
                     >
                       <Avatar name={m.userId.name} avatarUrl={m.userId.avatarUrl} size={20} fontSize={9.5} />
@@ -409,7 +443,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
               </div>
             )}
             <input ref={fileInputRef} type="file" onChange={onFilePicked} style={{ display: "none" }} />
-            <button type="button" className="btn btn-secondary btn-icon" disabled={sendingAttachment || voice.recording} onClick={() => fileInputRef.current?.click()} title="Attach a file">
+            <button type="button" className="btn btn-secondary btn-icon" disabled={sendingAttachment || voice.recording} onClick={() => fileInputRef.current?.click()} title="Attach a file" aria-label="Attach a file">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
             </button>
             <input
@@ -423,7 +457,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
               style={{ flex: 1 }}
             />
             {composer.trim() ? (
-              <button className="btn btn-primary btn-icon" type="button" onClick={sendMessage}>
+              <button className="btn btn-primary btn-icon" type="button" onClick={sendMessage} aria-label="Send message">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
               </button>
             ) : (
@@ -435,13 +469,17 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                 onPointerUp={endVoicePress}
                 onPointerLeave={endVoicePress}
                 onPointerCancel={endVoicePress}
+                onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); startVoicePress(); } }}
+                onKeyUp={(e) => { if (e.key === "Enter" || e.key === " ") endVoicePress(); }}
                 title="Hold to record a voice note"
+                aria-label="Hold to record a voice note"
                 style={{ background: voice.recording ? "oklch(60% 0.2 25)" : "var(--color-accent)", color: "var(--color-bg)", touchAction: "none" }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg>
               </button>
             )}
           </div>
+          {sendingAttachment && <div className="card-meta" style={{ marginTop: 4 }}>Uploading…</div>}
           {voice.error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 12, marginTop: 4 }}>{voice.error}</div>}
         </div>
       )}
@@ -449,7 +487,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
       {tab === "members" && (
         <div className="page-pad" style={{ padding: "0 40px 40px" }}>
           <div className="table-wrap">
-          <table className="table">
+          <table className="table responsive-table">
             <thead><tr><th>Name</th><th>Role</th><th></th></tr></thead>
             <tbody>
               {members?.map((m) => {
@@ -458,7 +496,15 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                   <tr key={m._id} className="row-hover" style={{ cursor: "default" }}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div onClick={() => !isMe && messageMember(m.userId._id)} style={{ cursor: isMe ? "default" : "pointer" }} title={isMe ? undefined : "Message"}>
+                        <div
+                          role={isMe ? undefined : "button"}
+                          tabIndex={isMe ? undefined : 0}
+                          onClick={() => !isMe && messageMember(m.userId._id)}
+                          onKeyDown={isMe ? undefined : onKeyActivate(() => messageMember(m.userId._id))}
+                          style={{ cursor: isMe ? "default" : "pointer" }}
+                          title={isMe ? undefined : "Message"}
+                          aria-label={isMe ? undefined : `Message ${m.userId.name}`}
+                        >
                           <Avatar name={m.userId.name} avatarUrl={m.userId.avatarUrl} size={28} online={isOnline(m.userId.lastActiveAt)} />
                         </div>
                         <div>
@@ -478,7 +524,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                             <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => setRole(m.userId._id, m.role === "admin" ? "member" : "admin")}>
                               {m.role === "admin" ? "Demote" : "Promote"}
                             </button>
-                            <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12, color: "var(--color-accent-300)" }} onClick={() => removeMember(m)}>
+                            <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12, color: "var(--color-accent-300)" }} onClick={() => setConfirmRemove(m)}>
                               Remove
                             </button>
                           </>
@@ -517,9 +563,11 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
       {seenByModal && (
         <div
           onClick={() => setSeenByModal(null)}
+          onKeyDown={(e) => { if (e.key === "Escape") setSeenByModal(null); }}
+          role="presentation"
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}
         >
-          <div onClick={(e) => e.stopPropagation()} className="card elev-sm" style={{ width: 320, maxWidth: "100%", maxHeight: "70vh", overflowY: "auto" }}>
+          <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Seen by" className="card elev-sm" style={{ width: 320, maxWidth: "100%", maxHeight: "70vh", overflowY: "auto" }}>
             <div className="card-title">Seen by</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {seenByModal.map((r) => (
@@ -534,9 +582,31 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                 </div>
               ))}
             </div>
-            <button className="btn btn-secondary btn-block" onClick={() => setSeenByModal(null)}>Close</button>
+            <button ref={seenByCloseRef} className="btn btn-secondary btn-block" onClick={() => setSeenByModal(null)}>Close</button>
           </div>
         </div>
+      )}
+
+      {confirmRemove && (
+        <ConfirmDialog
+          title="Remove member"
+          description={`${confirmRemove.userId.name} will lose access to this group and its tasks immediately. They'll need a new invite to rejoin.`}
+          confirmLabel="Remove"
+          danger
+          onConfirm={() => removeMember(confirmRemove)}
+          onCancel={() => setConfirmRemove(null)}
+        />
+      )}
+
+      {confirmLeave && (
+        <ConfirmDialog
+          title="Leave group"
+          description={`You'll lose access to ${group?.name ?? "this group"} and its tasks. You'll need a new invite to rejoin.`}
+          confirmLabel="Leave"
+          danger
+          onConfirm={leaveGroup}
+          onCancel={() => setConfirmLeave(false)}
+        />
       )}
     </div>
   );

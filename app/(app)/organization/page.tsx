@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { groupIcon } from "@/lib/group-icon";
+import { onKeyActivate } from "@/lib/a11y";
 
 type Org = { _id: string; name: string; regNumber: string; groupCreators: { _id: string; name: string; email: string }[] };
 type Group = { _id: string; name: string };
@@ -72,7 +73,7 @@ export default function OrganizationPage() {
             {groups.map((g) => {
               const icon = groupIcon(g.name);
               return (
-                <div key={g._id} className="row-hover" onClick={() => router.push(`/groups/${g._id}`)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 6px", borderRadius: 8, cursor: "pointer" }}>
+                <div key={g._id} role="button" tabIndex={0} className="row-hover" onClick={() => router.push(`/groups/${g._id}`)} onKeyDown={onKeyActivate(() => router.push(`/groups/${g._id}`))} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 6px", borderRadius: 8, cursor: "pointer" }}>
                   <div style={{ width: 26, height: 26, borderRadius: 7, background: icon.bg, color: icon.fg, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {icon.letter}
                   </div>

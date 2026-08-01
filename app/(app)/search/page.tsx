@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
+import { onKeyActivate } from "@/lib/a11y";
 
 type TaskResult = { taskId: string; title: string; projectName: string; groupName: string };
 type MessageResult = { messageId: string; groupId: string; groupName: string; text: string; senderName: string; createdAt: string };
@@ -51,7 +52,10 @@ export default function SearchPage() {
             {tasks.map((t) => (
               <div
                 key={t.taskId}
+                role="button"
+                tabIndex={0}
                 onClick={() => router.push(`/tasks/${t.taskId}`)}
+                onKeyDown={onKeyActivate(() => router.push(`/tasks/${t.taskId}`))}
                 className="row-hover"
                 style={{ display: "flex", justifyContent: "space-between", padding: "10px 12px", margin: "0 -12px", borderRadius: 8, borderBottom: "1px solid var(--color-divider)" }}
               >
@@ -70,7 +74,10 @@ export default function SearchPage() {
             {messages.map((m) => (
               <div
                 key={m.messageId}
+                role="button"
+                tabIndex={0}
                 onClick={() => router.push(`/groups/${m.groupId}`)}
+                onKeyDown={onKeyActivate(() => router.push(`/groups/${m.groupId}`))}
                 className="row-hover"
                 style={{ padding: "10px 12px", margin: "0 -12px", borderRadius: 8, borderBottom: "1px solid var(--color-divider)" }}
               >

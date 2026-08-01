@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { api } from "@/lib/api-client";
 import { statusColorVar } from "@/lib/status";
+import { onKeyActivate } from "@/lib/a11y";
 
 type Project = { _id: string; name: string; description: string; groupId: string };
 type Task = { _id: string; title: string; status: string; assignedTo: string | null; deadline: string | null };
@@ -48,7 +49,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
 
   return (
     <div className="tf-fade page-pad" style={{ padding: "24px 40px 40px", display: "flex", flexDirection: "column", height: "100%" }}>
-      <div onClick={() => project && router.push(`/groups/${project.groupId}`)} className="back-link" style={{ marginBottom: 14, width: "fit-content" }}>
+      <div role="link" tabIndex={0} onClick={() => project && router.push(`/groups/${project.groupId}`)} onKeyDown={onKeyActivate(() => project && router.push(`/groups/${project.groupId}`))} className="back-link" style={{ marginBottom: 14, width: "fit-content" }}>
         ← Back to group
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
@@ -72,7 +73,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", paddingTop: 2 }}>
                 {colTasks.map((t) => (
-                  <div key={t._id} className="card elev-sm kanban-card status-rail" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)}>
+                  <div key={t._id} role="button" tabIndex={0} className="card elev-sm kanban-card status-rail" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)} onKeyDown={onKeyActivate(() => router.push(`/tasks/${t._id}`))}>
                     <div className="card-title" style={{ fontSize: 14.5 }}>{t.title}</div>
                     <div className="card-meta">{nameFor(t.assignedTo)}</div>
                     {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due <span className="mono">{new Date(t.deadline).toLocaleDateString()}</span></span></div>}

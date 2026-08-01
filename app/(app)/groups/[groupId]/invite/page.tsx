@@ -3,6 +3,7 @@
 import { useState, use as usePromise } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
+import { onKeyActivate } from "@/lib/a11y";
 
 type Invite = { token: string; type: "email" | "link"; email: string | null };
 
@@ -40,7 +41,7 @@ export default function InvitePage({ params }: { params: Promise<{ groupId: stri
 
   return (
     <div className="tf-fade page-pad" style={{ padding: "24px 40px 40px", minHeight: "100%", display: "flex", flexDirection: "column" }}>
-      <div onClick={() => router.push(`/groups/${groupId}`)} className="back-link" style={{ marginBottom: 20, width: "fit-content" }}>
+      <div role="link" tabIndex={0} onClick={() => router.push(`/groups/${groupId}`)} onKeyDown={onKeyActivate(() => router.push(`/groups/${groupId}`))} className="back-link" style={{ marginBottom: 20, width: "fit-content" }}>
         ← Back to group
       </div>
 

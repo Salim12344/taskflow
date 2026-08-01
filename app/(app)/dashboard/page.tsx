@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { groupIcon } from "@/lib/group-icon";
+import { onKeyActivate } from "@/lib/a11y";
 
 type Group = { _id: string; name: string; orgId: string | null };
 
@@ -76,7 +77,7 @@ export default function DashboardPage() {
         {groups?.map((g) => {
           const icon = groupIcon(g.name);
           return (
-            <div key={g._id} className="card elev-sm card-clickable" onClick={() => router.push(`/groups/${g._id}`)}>
+            <div key={g._id} role="button" tabIndex={0} className="card elev-sm card-clickable" onClick={() => router.push(`/groups/${g._id}`)} onKeyDown={onKeyActivate(() => router.push(`/groups/${g._id}`))}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: icon.bg, color: icon.fg, fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {icon.letter}
               </div>
