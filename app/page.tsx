@@ -114,8 +114,14 @@ export default function HomePage() {
             all in one place.
           </p>
           <div style={{ display: "flex", gap: 12 }}>
-            <Link className="btn btn-primary" href="/signup" style={{ padding: "10px 22px", fontSize: 14 }}>Get started free</Link>
-            <Link className="btn btn-secondary" href="/login" style={{ padding: "10px 22px", fontSize: 14 }}>Log in</Link>
+            {status === "authenticated" ? (
+              <Link className="btn btn-primary" href="/dashboard" style={{ padding: "10px 22px", fontSize: 14 }}>Go to dashboard</Link>
+            ) : (
+              <>
+                <Link className="btn btn-primary" href="/signup" style={{ padding: "10px 22px", fontSize: 14 }}>Get started free</Link>
+                <Link className="btn btn-secondary" href="/login" style={{ padding: "10px 22px", fontSize: 14 }}>Log in</Link>
+              </>
+            )}
           </div>
         </section>
 
@@ -197,11 +203,23 @@ export default function HomePage() {
         {/* CTA */}
         <section style={{ padding: "0 clamp(16px, 5vw, 40px) 96px", textAlign: "center" }}>
           <div className="card elev-sm" style={{ maxWidth: 560, margin: "0 auto", alignItems: "center", padding: "36px 32px", background: "linear-gradient(135deg, var(--color-surface), color-mix(in srgb, var(--color-accent) 8%, var(--color-surface)))" }}>
-            <h2 style={{ fontSize: 22, marginBottom: 6 }}>Ready to get your team organized?</h2>
-            <p style={{ fontSize: 13.5, color: "color-mix(in srgb, var(--color-text) 60%, transparent)", marginBottom: 18 }}>
-              Create a group, invite your people, and assign your first task in under two minutes.
-            </p>
-            <Link className="btn btn-primary" href="/signup" style={{ padding: "10px 24px", fontSize: 14 }}>Create your account</Link>
+            {status === "authenticated" ? (
+              <>
+                <h2 style={{ fontSize: 22, marginBottom: 6 }}>Pick up where you left off</h2>
+                <p style={{ fontSize: 13.5, color: "color-mix(in srgb, var(--color-text) 60%, transparent)", marginBottom: 18 }}>
+                  Your groups, projects, and tasks are waiting.
+                </p>
+                <Link className="btn btn-primary" href="/dashboard" style={{ padding: "10px 24px", fontSize: 14 }}>Go to dashboard</Link>
+              </>
+            ) : (
+              <>
+                <h2 style={{ fontSize: 22, marginBottom: 6 }}>Ready to get your team organized?</h2>
+                <p style={{ fontSize: 13.5, color: "color-mix(in srgb, var(--color-text) 60%, transparent)", marginBottom: 18 }}>
+                  Create a group, invite your people, and assign your first task in under two minutes.
+                </p>
+                <Link className="btn btn-primary" href="/signup" style={{ padding: "10px 24px", fontSize: 14 }}>Create your account</Link>
+              </>
+            )}
           </div>
         </section>
       </main>

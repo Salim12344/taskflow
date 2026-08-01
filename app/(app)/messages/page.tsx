@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { api } from "@/lib/api-client";
 import { Avatar } from "@/components/Avatar";
 import { isOnline, formatLastSeen } from "@/lib/presence";
+import { formatChatListTimestamp } from "@/lib/format-time";
 
 type Thread = {
   threadId: string;
@@ -56,7 +57,7 @@ export default function MessagesInboxPage() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
                 <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 45%, transparent)" }}>
-                  {t.lastMessageAt ? new Date(t.lastMessageAt).toLocaleDateString() : ""}
+                  {t.lastMessageAt ? formatChatListTimestamp(t.lastMessageAt) : ""}
                 </div>
                 {t.unread > 0 && (
                   <span style={{ background: "var(--color-accent)", color: "var(--color-bg)", fontSize: 10, fontWeight: 600, minWidth: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
