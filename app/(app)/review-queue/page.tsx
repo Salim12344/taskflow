@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
+import { statusColorVar } from "@/lib/status";
 
 type Section = {
   groupId: string;
@@ -43,7 +44,10 @@ export default function ReviewQueuePage() {
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {sections?.map((s) => (
           <div key={s.groupId}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{s.groupName}</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{s.groupName}</span>
+              <span className="mono" style={{ fontSize: 11, color: statusColorVar(status) }}>[{String(s.tasks.length).padStart(2, "0")}]</span>
+            </div>
             <div className="card elev-sm" style={{ gap: 0 }}>
               {s.tasks.map((t) => (
                 <div
@@ -53,7 +57,7 @@ export default function ReviewQueuePage() {
                   style={{ display: "flex", justifyContent: "space-between", padding: "10px 12px", margin: "0 -12px", borderRadius: 8, borderBottom: "1px solid var(--color-divider)" }}
                 >
                   <span style={{ fontSize: 13.5 }}>{t.title} <span style={{ opacity: 0.6 }}>· {t.projectName}</span></span>
-                  <span style={{ fontSize: 11.5, opacity: 0.6 }}>{t.submittedAt ? new Date(t.submittedAt).toLocaleDateString() : ""}</span>
+                  <span className="mono" style={{ fontSize: 11.5, opacity: 0.6 }}>{t.submittedAt ? new Date(t.submittedAt).toLocaleDateString() : ""}</span>
                 </div>
               ))}
             </div>

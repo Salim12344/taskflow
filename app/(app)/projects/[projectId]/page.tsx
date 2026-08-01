@@ -63,15 +63,19 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
           const colTasks = tasks?.filter((t) => t.status === col.key) ?? [];
           return (
             <div key={col.key} style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
-              <div style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>
-                {col.label} · {colTasks.length}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", paddingBottom: 8 }}>
+                  <span style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "color-mix(in srgb, var(--color-text) 65%, transparent)" }}>{col.label}</span>
+                  <span className="mono" style={{ fontSize: 11, color: statusColorVar(col.key) }}>[{String(colTasks.length).padStart(2, "0")}]</span>
+                </div>
+                <div style={{ height: 2, background: statusColorVar(col.key), opacity: colTasks.length ? 0.7 : 0.2, borderRadius: 1 }} />
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", paddingTop: 2 }}>
                 {colTasks.map((t) => (
                   <div key={t._id} className="card elev-sm kanban-card status-rail" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)}>
                     <div className="card-title" style={{ fontSize: 14.5 }}>{t.title}</div>
                     <div className="card-meta">{nameFor(t.assignedTo)}</div>
-                    {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due {new Date(t.deadline).toLocaleDateString()}</span></div>}
+                    {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due <span className="mono">{new Date(t.deadline).toLocaleDateString()}</span></span></div>}
                   </div>
                 ))}
               </div>
@@ -92,7 +96,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
             <div key={t._id} className="card elev-sm kanban-card status-rail" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)}>
               <div className="card-title" style={{ fontSize: 14.5 }}>{t.title}</div>
               <div className="card-meta">{nameFor(t.assignedTo)}</div>
-              {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due {new Date(t.deadline).toLocaleDateString()}</span></div>}
+              {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due <span className="mono">{new Date(t.deadline).toLocaleDateString()}</span></span></div>}
             </div>
           ))}
           {tasks && tasks.filter((t) => t.status === mobileStatus).length === 0 && (
