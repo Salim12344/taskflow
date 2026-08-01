@@ -6,6 +6,7 @@ import GroupMember from "@/models/GroupMember";
 import Organization from "@/models/Organization";
 import Project from "@/models/Project";
 import Task from "@/models/Task";
+import { groupIdsFor } from "@/lib/permissions";
 
 const VALID_STATUSES = ["todo", "in_progress", "pending_review", "done"];
 
@@ -29,7 +30,11 @@ export async function GET(req: NextRequest) {
     orgGroups.forEach((g) => adminGroupIds.add(g._id.toString()));
   }
 
-  const groups = await Group.find({ _id: { $in: [...adminGroupIds] }, deletedAt: null });
+  // Not an admin anywhere: this page has nothing to review, so it becomes "my tasks" instead
+  // of an admin queue that's permanently empty for the majority of users.
+  const isAdminAnywhere = adminGroupIds.size > 0;
+  const groupIds = isAdminAnywhere ? [...adminGroupIds] : [...(await groupIdsFor(userId))];
+  const groups = await Group.find({ _id: { $in: groupIds }, deletedAt: null });
 
   const sections = [];
   for (const group of groups) {
@@ -39,6 +44,7 @@ export async function GET(req: NextRequest) {
       projectId: { $in: projects.map((p) => p._id) },
       status,
       deletedAt: null,
+      ...(isAdminAnywhere ? {} : { assignedTo: userId }),
     }).sort(status === "pending_review" ? { submittedAt: 1 } : { createdAt: -1 });
 
     if (tasks.length === 0) continue;
@@ -56,5 +62,5 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ sections });
+  return NextResponse.json({ sections, mine: !isAdminAnywhere });
 }

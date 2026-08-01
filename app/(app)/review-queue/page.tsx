@@ -21,24 +21,58 @@ const STATUS_OPTIONS = [
 export default function ReviewQueuePage() {
   const router = useRouter();
   const [status, setStatus] = useState("pending_review");
-  const [sections, setSections] = useState<Section[] | null>(null);
+  const [byStatus, setByStatus] = useState<Record<string, Section[]>>({});
+  const [mine, setMine] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setSections(null);
-    api<{ sections: Section[] }>(`/api/review-queue?status=${status}`)
-      .then((d) => setSections(d.sections))
+    Promise.all(
+      STATUS_OPTIONS.map((o) =>
+        api<{ sections: Section[]; mine: boolean }>(`/api/review-queue?status=${o.value}`).then((d) => [o.value, d] as const)
+      )
+    )
+      .then((entries) => {
+        setByStatus(Object.fromEntries(entries.map(([k, d]) => [k, d.sections])));
+        setMine(entries[0]?.[1].mine ?? false);
+      })
       .catch((e) => setError(e.message));
-  }, [status]);
+  }, []);
+
+  const countFor = (s: string) => (byStatus[s] ?? []).reduce((sum, sec) => sum + sec.tasks.length, 0);
+  const sections = byStatus[status];
 
   return (
     <div className="tf-fade page-pad" style={{ padding: "32px 40px 40px", maxWidth: 1200 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
-        <h2>Tasks — {STATUS_OPTIONS.find((o) => o.value === status)?.label}</h2>
-        <select className="input" style={{ width: "auto" }} value={status} onChange={(e) => setStatus(e.target.value)}>
-          {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+      <h2 style={{ marginBottom: 16 }}>{mine ? "My tasks" : "Tasks"}</h2>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
+        {STATUS_OPTIONS.map((o) => {
+          const active = status === o.value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setStatus(o.value)}
+              className="tab-btn"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                border: "1px solid var(--color-divider)",
+                borderRadius: 8,
+                background: active ? "color-mix(in srgb, var(--color-accent) 16%, transparent)" : "transparent",
+                borderColor: active ? "var(--color-accent)" : "var(--color-divider)",
+                color: active ? "var(--color-accent-300)" : "inherit",
+              }}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: statusColorVar(o.value), flex: "none" }} />
+              {o.label}
+              <span className="mono" style={{ fontSize: 11, opacity: active ? 1 : 0.55 }}>{countFor(o.value)}</span>
+            </button>
+          );
+        })}
       </div>
+
       {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13 }}>{error}</div>}
       {sections?.length === 0 && <div className="card-meta">Nothing here.</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

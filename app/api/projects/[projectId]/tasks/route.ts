@@ -5,6 +5,7 @@ import Project from "@/models/Project";
 import Task from "@/models/Task";
 import { isAssignableMember, isGroupAdmin, isGroupMember, getActiveGroup } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity";
+import { notify } from "@/lib/notify";
 
 async function loadActiveProject(projectId: string) {
   const project = await Project.findById(projectId);
@@ -64,6 +65,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
     subtasks: subtasks ?? [],
   });
   await logActivity(project.groupId.toString(), session.user.id, "task_created", "task", task._id.toString(), `${session.user.name} created task "${title}"`);
+  if (assignedTo) {
+    await notify(assignedTo, "task_reassigned", `You were assigned "${task.title}"`, { payload: { taskId: task._id } });
+  }
 
   return NextResponse.json({ task }, { status: 201 });
 }

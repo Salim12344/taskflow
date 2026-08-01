@@ -118,7 +118,7 @@ export default function HomePage() {
               <Link className="btn btn-primary" href="/dashboard" style={{ padding: "10px 22px", fontSize: 14 }}>Go to dashboard</Link>
             ) : (
               <>
-                <Link className="btn btn-primary" href="/signup" style={{ padding: "10px 22px", fontSize: 14 }}>Get started free</Link>
+                <Link className="btn btn-primary" href="/signup" style={{ padding: "10px 22px", fontSize: 14 }}>Get started</Link>
                 <Link className="btn btn-secondary" href="/login" style={{ padding: "10px 22px", fontSize: 14 }}>Log in</Link>
               </>
             )}
