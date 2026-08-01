@@ -23,8 +23,6 @@ const DMMessageSchema = new Schema({
   },
   createdAt: { type: Date, default: Date.now },
   readAt: { type: Date, default: null },
-  // "Delete for me" only — hides the message from this user's own view without touching the other side's copy.
-  deletedFor: [{ type: Schema.Types.ObjectId, ref: "User" }],
 });
 
 DMMessageSchema.index({ threadId: 1, createdAt: 1 });

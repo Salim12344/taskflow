@@ -22,7 +22,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ threadI
   const thread = await requireParticipant(threadId, session.user.id);
   if (!thread) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const messages = await DMMessage.find({ threadId, deletedFor: { $ne: session.user.id } }).sort({ createdAt: 1 });
+  const messages = await DMMessage.find({ threadId }).sort({ createdAt: 1 });
 
   await DMMessage.updateMany(
     { threadId, senderId: { $ne: session.user.id }, readAt: null },
