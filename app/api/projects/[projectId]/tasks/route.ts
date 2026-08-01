@@ -38,6 +38,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
   const { projectId } = await params;
   const { title, description, assignedTo, deadline, recurrence, subtasks } = await req.json();
   if (!title) return NextResponse.json({ error: "title is required" }, { status: 400 });
+  if (deadline && new Date(deadline) < new Date()) {
+    return NextResponse.json({ error: "Deadline can't be in the past" }, { status: 400 });
+  }
 
   await connectDB();
   const ctx = await loadActiveProject(projectId);

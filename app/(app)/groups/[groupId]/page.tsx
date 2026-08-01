@@ -11,6 +11,7 @@ import { useVoiceRecorder } from "@/lib/use-voice-recorder";
 import { isOnline, formatLastSeen } from "@/lib/presence";
 import { onKeyActivate } from "@/lib/a11y";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useStickToBottom } from "@/lib/use-stick-to-bottom";
 
 type Group = { _id: string; name: string };
 type Project = { _id: string; name: string; description: string; status: string };
@@ -68,7 +69,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   const [confirmRemove, setConfirmRemove] = useState<Member | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const voice = useVoiceRecorder();
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const { containerRef: chatContainerRef, endRef: chatEndRef, onScroll: onChatScroll } = useStickToBottom(messages);
   const lastTypingPingRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const seenByCloseRef = useRef<HTMLButtonElement>(null);
@@ -111,9 +112,6 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, groupId]);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ block: "end" });
-  }, [messages]);
 
   useEffect(() => {
     if (tab !== "activity") return;
@@ -256,8 +254,8 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   }
 
   return (
-    <div>
-      <div className="tf-fade page-pad" style={{ padding: "24px 40px 0" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div className="tf-fade page-pad" style={{ padding: "24px 40px 0", flex: "none" }}>
         <div role="link" tabIndex={0} onClick={() => router.push("/dashboard")} onKeyDown={onKeyActivate(() => router.push("/dashboard"))} className="back-link" style={{ marginBottom: 14 }}>
           ← Dashboard
         </div>
@@ -337,8 +335,8 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
       )}
 
       {tab === "chat" && (
-        <div className="page-pad" style={{ padding: "0 40px 40px", display: "flex", flexDirection: "column", height: "calc(100dvh - 260px)", minHeight: 360 }}>
-          <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, padding: "6px 0" }}>
+        <div className="page-pad" style={{ padding: "0 40px 40px", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+          <div ref={chatContainerRef} onScroll={onChatScroll} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, padding: "6px 0" }}>
             {messages.length === 0 && <div className="card-meta">No messages yet. Say hello.</div>}
             {messages.map((m) => {
               const senderId = typeof m.senderId === "string" ? m.senderId : m.senderId._id;

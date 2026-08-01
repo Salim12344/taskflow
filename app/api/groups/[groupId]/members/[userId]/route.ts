@@ -40,6 +40,27 @@ async function activeTaskCounts(groupId: string, userId: string) {
   return { total: tasks.length, pendingReview: tasks.filter((t) => t.status === "pending_review").length };
 }
 
+/**
+ * A task's delegated manager (reviewerId) or an in-flight hand-off offer that points at someone
+ * who's no longer an admin here (demoted or removed) would otherwise lock the task to a person
+ * who can't act on it anymore — clear both back to the default (the task's creator).
+ */
+async function clearDelegationsFor(groupId: string, userId: string) {
+  const projectIds = await projectIdsFor(groupId);
+  await Task.updateMany(
+    { projectId: { $in: projectIds }, reviewerId: userId, deletedAt: null },
+    { $set: { reviewerId: null } }
+  );
+  await Task.updateMany(
+    {
+      projectId: { $in: projectIds },
+      deletedAt: null,
+      $or: [{ "pendingReviewDelegation.toUserId": userId }, { "pendingReviewDelegation.fromUserId": userId }],
+    },
+    { $set: { pendingReviewDelegation: null } }
+  );
+}
+
 export async function DELETE(_req: Request, { params }: { params: Promise<{ groupId: string; userId: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -75,6 +96,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ grou
   }
 
   const tasksUnassigned = await unassignActiveTasks(groupId, userId);
+  await clearDelegationsFor(groupId, userId);
   await GroupMember.deleteOne({ groupId, userId });
   const removedUser = await User.findById(userId, "name");
   await logActivity(groupId, session.user.id, "member_removed", "user", userId, `${session.user.name} removed ${removedUser?.name ?? "a member"} from the group`);
@@ -148,6 +170,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ groupI
   const oldRole = target.role;
   target.role = role;
   await target.save();
+  if (oldRole === "admin" && role === "member") {
+    await clearDelegationsFor(groupId, userId);
+  }
   if (oldRole !== role) {
     const targetUser = await User.findById(userId, "name");
     const verb = role === "admin" ? "promoted" : "demoted";

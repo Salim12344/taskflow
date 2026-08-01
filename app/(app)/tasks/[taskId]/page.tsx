@@ -10,6 +10,7 @@ import { useVoiceRecorder } from "@/lib/use-voice-recorder";
 import { statusColorVar } from "@/lib/status";
 import { onKeyActivate } from "@/lib/a11y";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useStickToBottom } from "@/lib/use-stick-to-bottom";
 
 type Task = {
   _id: string;
@@ -56,7 +57,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const voice = useVoiceRecorder();
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const { containerRef: chatContainerRef, endRef: chatEndRef, onScroll: onChatScroll } = useStickToBottom(chatMessages);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function load() {
@@ -88,9 +89,6 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ block: "end" });
-  }, [chatMessages]);
 
   const userId = session?.user?.id;
   const isAssignee = task?.assignedTo === userId;
@@ -343,7 +341,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
           {!chatCanWrite && (
             <div className="card-body">You can view this thread, but only the assignee and the task&rsquo;s manager can post here.</div>
           )}
-          <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+          <div ref={chatContainerRef} onScroll={onChatScroll} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
             {chatMessages.length === 0 && <div className="card-meta">No messages yet.</div>}
             {chatMessages.map((m) => {
               const mine = m.senderId === userId;

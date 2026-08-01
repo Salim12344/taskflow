@@ -142,6 +142,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
 
   // --- Field edits (admin only, and only the delegated manager once one's been accepted) ---
   if (admin && canManage) {
+    if (body.deadline && new Date(body.deadline) < new Date()) {
+      return NextResponse.json({ error: "Deadline can't be in the past" }, { status: 400 });
+    }
     const editable = ["title", "description", "deadline", "recurrence"] as const;
     for (const key of editable) {
       if (key in body) (task as Record<string, unknown>)[key] = body[key];
@@ -180,16 +183,17 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ task
   await connectDB();
   const ctx = await loadTaskContext(taskId);
   if (!ctx?.project) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const { task, group } = ctx;
+  const { task, project, group } = ctx;
 
   if (task.status === "done") {
     return NextResponse.json({ error: "Approved tasks can't be deleted" }, { status: 400 });
   }
 
   const orgId = group?.orgId?.toString() ?? null;
-  const isCreator = task.createdBy.toString() === session.user.id;
-  // Default manager is the creator, not any admin — once delegated, deletion rights move
-  // with it too, except the org owner, who always keeps an emergency fallback.
+  const groupId = project.groupId.toString();
+  // A creator who's since left the group (or been demoted) shouldn't keep a standing right to
+  // delete tasks there — the fallback only holds while they're still actually an admin.
+  const isCreator = task.createdBy.toString() === session.user.id && (await isGroupAdmin(groupId, session.user.id, orgId));
   const canManage = await canManageTask(task.reviewerId?.toString() ?? null, orgId, session.user.id, isCreator);
   if (!canManage) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

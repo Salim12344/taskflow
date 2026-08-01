@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { notify } from "@/lib/notify";
 import { loadTaskContext } from "@/lib/task-context";
+import { isGroupAdmin } from "@/lib/permissions";
 
 export async function POST(req: Request, { params }: { params: Promise<{ taskId: string }> }) {
   const session = await auth();
@@ -12,11 +13,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
 
   const ctx = await loadTaskContext(taskId);
   if (!ctx?.project) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const { task } = ctx;
+  const { task, project, group } = ctx;
 
   const delegation = task.pendingReviewDelegation;
   if (!delegation || delegation.toUserId.toString() !== session.user.id) {
     return NextResponse.json({ error: "No pending delegation request for you on this task" }, { status: 404 });
+  }
+
+  // Closes a narrow race: if the responder was demoted/removed after the offer was sent but
+  // before they acted on it, they can no longer accept management they don't have rights to.
+  if (accept && !(await isGroupAdmin(project.groupId.toString(), session.user.id, group?.orgId?.toString() ?? null))) {
+    task.pendingReviewDelegation = null;
+    await task.save();
+    return NextResponse.json({ error: "You're no longer an admin of this group — the offer has been withdrawn" }, { status: 403 });
   }
 
   task.pendingReviewDelegation = null;

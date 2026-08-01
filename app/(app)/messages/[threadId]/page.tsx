@@ -9,6 +9,7 @@ import { AttachmentView } from "@/components/AttachmentView";
 import { useVoiceRecorder } from "@/lib/use-voice-recorder";
 import { isOnline, formatLastSeen } from "@/lib/presence";
 import { onKeyActivate } from "@/lib/a11y";
+import { useStickToBottom } from "@/lib/use-stick-to-bottom";
 
 type ReplyTo = { messageId: string; text: string; senderName: string };
 type Message = { _id: string; text: string; senderId: string; createdAt: string; readAt: string | null; replyTo: ReplyTo | null; attachments: Attachment[] };
@@ -30,7 +31,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
   const [replyingTo, setReplyingTo] = useState<{ _id: string; text: string } | null>(null);
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const voice = useVoiceRecorder();
-  const endRef = useRef<HTMLDivElement>(null);
+  const { containerRef: chatContainerRef, endRef, onScroll: onChatScroll } = useStickToBottom(messages);
   const lastTypingPingRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,10 +68,6 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages]);
 
   async function sendMessage() {
     if (!composer.trim()) return;
@@ -137,7 +134,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
       </div>
       {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
 
-      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div ref={chatContainerRef} onScroll={onChatScroll} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
         {messages.length === 0 && <div className="card-meta">No messages yet. Say hello.</div>}
         {messages.map((m, i) => {
           const mine = m.senderId === session?.user?.id;
