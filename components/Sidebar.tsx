@@ -131,6 +131,7 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 10px" }}>
         <NavRow href="/dashboard" label="Dashboard" active={pathname === "/dashboard"} />
+        <NavRow href="/search" label="Search" active={pathname === "/search"} />
         <NavRow
           href="/notifications"
           label="Notifications"

@@ -2,6 +2,14 @@ function initialsOf(name: string) {
   return name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 }
 
+/** Deterministic hue from the name so the same person always gets the same color, without storing one. */
+function avatarHues(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = hash % 360;
+  return { a: `oklch(58% 0.13 ${hue})`, b: `oklch(38% 0.12 ${(hue + 40) % 360})` };
+}
+
 function OnlineDot({ size }: { size: number }) {
   const dot = Math.max(8, Math.round(size * 0.28));
   return (
@@ -34,7 +42,15 @@ export function Avatar({ name, avatarUrl, size = 32, fontSize, online = false }:
           style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover" }}
         />
       ) : (
-        <div className="avatar" style={{ width: size, height: size, fontSize: fs }}>
+        <div
+          className="avatar"
+          style={{
+            width: size,
+            height: size,
+            fontSize: fs,
+            ...(name ? { "--avatar-a": avatarHues(name).a, "--avatar-b": avatarHues(name).b } as React.CSSProperties : {}),
+          }}
+        >
           {initialsOf(name) || "?"}
         </div>
       )}

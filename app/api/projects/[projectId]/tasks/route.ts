@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db";
 import Project from "@/models/Project";
 import Task from "@/models/Task";
 import { isAssignableMember, isGroupAdmin, isGroupMember, getActiveGroup } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity";
 
 async function loadActiveProject(projectId: string) {
   const project = await Project.findById(projectId);
@@ -62,6 +63,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
     recurrence: recurrence ?? "none",
     subtasks: subtasks ?? [],
   });
+  await logActivity(project.groupId.toString(), session.user.id, "task_created", "task", task._id.toString(), `${session.user.name} created task "${title}"`);
 
   return NextResponse.json({ task }, { status: 201 });
 }

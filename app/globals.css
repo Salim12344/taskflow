@@ -8,36 +8,52 @@
   --color-neutral-300: oklch(75% 0.01 280);
   --color-neutral-700: oklch(38% 0.015 280);
   --color-neutral-800: oklch(30% 0.015 280);
-  --color-accent: oklch(70% 0.16 292);
-  --color-accent-100: oklch(94% 0.03 292);
-  --color-accent-300: oklch(78% 0.13 292);
-  --color-accent-700: oklch(45% 0.16 292);
-  --color-teal: oklch(72% 0.13 185);
-  --color-teal-bg: oklch(26% 0.05 185);
-  --color-amber: oklch(78% 0.15 80);
-  --color-amber-bg: oklch(28% 0.06 80);
-  --color-pink: oklch(72% 0.16 350);
-  --color-pink-bg: oklch(27% 0.06 350);
-  --color-green: oklch(75% 0.15 145);
-  --color-green-bg: oklch(27% 0.06 145);
-  --color-blue: oklch(72% 0.13 240);
-  --color-blue-bg: oklch(26% 0.05 240);
-  --font-heading: var(--font-geist-sans), sans-serif;
+  --color-accent: oklch(70% 0.17 296);
+  --color-accent-100: oklch(94% 0.03 296);
+  --color-accent-300: oklch(80% 0.14 296);
+  --color-accent-700: oklch(45% 0.17 296);
+  --color-teal: oklch(76% 0.13 195);
+  --color-teal-bg: oklch(26% 0.05 195);
+  --color-amber: oklch(80% 0.15 75);
+  --color-amber-bg: oklch(28% 0.06 75);
+  --color-pink: oklch(74% 0.17 355);
+  --color-pink-bg: oklch(27% 0.06 355);
+  --color-green: oklch(78% 0.15 150);
+  --color-green-bg: oklch(27% 0.06 150);
+  --color-blue: oklch(74% 0.13 235);
+  --color-blue-bg: oklch(26% 0.05 235);
+  /* Status system — every task's lifecycle stage gets one fixed color, reused everywhere
+     (kanban rail, tags, sidebar) as the app's consistent visual signature. */
+  --status-todo: var(--color-blue);
+  --status-todo-bg: var(--color-blue-bg);
+  --status-in_progress: var(--color-amber);
+  --status-in_progress-bg: var(--color-amber-bg);
+  --status-pending_review: var(--color-pink);
+  --status-pending_review-bg: var(--color-pink-bg);
+  --status-done: var(--color-green);
+  --status-done-bg: var(--color-green-bg);
+  --font-heading: var(--font-space-grotesk), var(--font-geist-sans), sans-serif;
   --font-body: var(--font-geist-sans), sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 4px 24px color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--color-bg);
+  background:
+    radial-gradient(ellipse 900px 500px at 15% -10%, color-mix(in srgb, var(--color-accent) 7%, transparent), transparent),
+    var(--color-bg);
+  background-attachment: fixed;
   color: var(--color-text);
   font-family: var(--font-body);
 }
 
-h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; margin: 0; }
+h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+.mono { font-family: var(--font-mono); font-feature-settings: "tnum"; }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--color-neutral-800); border-radius: 8px; }
@@ -47,10 +63,13 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; margin: 0; }
 .tf-fade { animation: tf-fade .2s ease; }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--color-surface);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-text) 3%, transparent), transparent 40%),
+    var(--color-surface);
   border: 1px solid var(--color-divider);
   border-radius: 12px;
   padding: 16px;
@@ -63,8 +82,17 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; margin: 0; }
 
 .card-hover-lift:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-divider)); }
 
-.kanban-card { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.kanban-card {
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
 .kanban-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-divider)); }
+
+/* Signature: every task's lifecycle stage shows as a colored rail down the card's left edge
+   — the app's one consistent visual fingerprint for "where is this right now". */
+.status-rail { border-left: 3px solid var(--rail-color, var(--color-divider)); padding-left: 13px !important; }
 
 .row-hover { transition: background .12s ease; cursor: pointer; }
 .row-hover:hover { background: color-mix(in srgb, var(--color-text) 5%, transparent); }
@@ -89,8 +117,12 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; margin: 0; }
   transition: opacity .12s ease, background .12s ease;
 }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn-primary { background: var(--color-accent); color: var(--color-bg); }
-.btn-primary:hover:not(:disabled) { opacity: .9; }
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-accent-300), var(--color-accent));
+  color: var(--color-bg);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+.btn-primary:hover:not(:disabled) { box-shadow: 0 4px 16px color-mix(in srgb, var(--color-accent) 45%, transparent); }
 .btn-secondary { background: transparent; border: 1px solid var(--color-divider); color: var(--color-text); }
 .btn-secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--color-text) 6%, transparent); border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-divider)); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
@@ -210,7 +242,7 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; margin: 0; }
 
 .avatar {
   border-radius: 50%;
-  background: var(--color-neutral-700);
+  background: linear-gradient(135deg, var(--avatar-a, var(--color-neutral-700)), var(--avatar-b, var(--color-neutral-800)));
   display: flex;
   align-items: center;
   justify-content: center;

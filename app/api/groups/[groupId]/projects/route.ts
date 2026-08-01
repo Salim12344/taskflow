@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db";
 import Group from "@/models/Group";
 import Project from "@/models/Project";
 import { isGroupAdmin, isGroupMember } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ groupId: string }> }) {
   const session = await auth();
@@ -43,6 +44,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ groupId
     deadline: deadline ?? null,
     createdBy: session.user.id,
   });
+  await logActivity(groupId, session.user.id, "project_created", "project", project._id.toString(), `${session.user.name} created project "${name}"`);
 
   return NextResponse.json({ project }, { status: 201 });
 }

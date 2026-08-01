@@ -71,6 +71,11 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
 
+  async function deleteForMe(messageId: string) {
+    setMessages((prev) => prev.filter((m) => m._id !== messageId));
+    await api(`/api/dm/${threadId}/messages/${messageId}`, { method: "DELETE" }).catch(() => {});
+  }
+
   async function sendMessage() {
     if (!composer.trim()) return;
     const text = composer;
@@ -163,6 +168,13 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
                   style={{ background: "none", border: "none", cursor: "pointer", padding: 4, opacity: 0.55, flex: "none" }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17l-5-5 5-5M4 12h10a5 5 0 015 5v2" /></svg>
+                </button>
+                <button
+                  onClick={() => confirm("Delete this message? It'll still be visible to the other person.") && deleteForMe(m._id)}
+                  title="Delete for me"
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 4, opacity: 0.55, flex: "none" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" /></svg>
                 </button>
               </div>
               {isLastMine && (

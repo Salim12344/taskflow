@@ -7,6 +7,7 @@ import { api, uploadFile, type Attachment } from "@/lib/api-client";
 import { Avatar } from "@/components/Avatar";
 import { AttachmentView } from "@/components/AttachmentView";
 import { useVoiceRecorder } from "@/lib/use-voice-recorder";
+import { statusColorVar } from "@/lib/status";
 
 type Task = {
   _id: string;
@@ -226,7 +227,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
         <h3>{task.title}</h3>
-        <span className="tag tag-neutral">{STATUS_LABEL[task.status]}</span>
+        <span className="tag" style={{ background: `color-mix(in srgb, ${statusColorVar(task.status)} 18%, transparent)`, color: statusColorVar(task.status) }}>{STATUS_LABEL[task.status]}</span>
       </div>
       {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
 

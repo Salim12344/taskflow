@@ -8,6 +8,7 @@ import Task from "@/models/Task";
 import User from "@/models/User";
 import { notifyMany } from "@/lib/notify";
 import { isGroupAdmin, countPendingReviewTasks, hasAnotherAdmin, isOrgOwnerOfGroup } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity";
 
 async function projectIdsFor(groupId: string) {
   const projects = await Project.find({ groupId }, "_id");
@@ -75,6 +76,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ grou
 
   const tasksUnassigned = await unassignActiveTasks(groupId, userId);
   await GroupMember.deleteOne({ groupId, userId });
+  const removedUser = await User.findById(userId, "name");
+  await logActivity(groupId, session.user.id, "member_removed", "user", userId, `${session.user.name} removed ${removedUser?.name ?? "a member"} from the group`);
 
   return NextResponse.json({ ok: true, tasksUnassigned });
 }
@@ -142,8 +145,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ groupI
     }
   }
 
+  const oldRole = target.role;
   target.role = role;
   await target.save();
+  if (oldRole !== role) {
+    const targetUser = await User.findById(userId, "name");
+    const verb = role === "admin" ? "promoted" : "demoted";
+    await logActivity(groupId, session.user.id, `member_${verb}`, "user", userId, `${session.user.name} ${verb} ${targetUser?.name ?? "a member"}`);
+  }
 
   return NextResponse.json({ member: target });
 }

@@ -52,7 +52,7 @@ export async function isAssignableMember(groupId: string, userId: string) {
 }
 
 /** All group IDs this user belongs to — explicit membership, plus every group under an org they own. */
-async function groupIdsFor(userId: string) {
+export async function groupIdsFor(userId: string) {
   await connectDB();
   const explicit = await GroupMember.find({ userId }, "groupId");
   const groupIds = new Set(explicit.map((g) => g.groupId.toString()));

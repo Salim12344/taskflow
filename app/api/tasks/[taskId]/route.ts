@@ -9,6 +9,7 @@ import { notify, notifyMany } from "@/lib/notify";
 import { isAssignableMember, isGroupAdmin, isGroupMember, canManageTask } from "@/lib/permissions";
 import { nextDueDate } from "@/lib/recurrence";
 import { loadTaskContext } from "@/lib/task-context";
+import { logActivity } from "@/lib/activity";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   todo: ["in_progress"],
@@ -82,6 +83,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
         if (!body.reason) return NextResponse.json({ error: "reason is required to reject a task" }, { status: 400 });
         task.rejectionHistory.push({ reviewerId: userId, reason: body.reason, createdAt: new Date() });
         await TaskChatMessage.create({ taskId: task._id, senderId: userId, text: body.reason });
+        await logActivity(groupId, userId, "task_rejected", "task", task._id.toString(), `${session.user.name} rejected "${task.title}"`);
         if (task.assignedTo) {
           await notify(
             task.assignedTo.toString(),
@@ -92,6 +94,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
         }
       } else if (body.status === "done") {
         // Approve
+        await logActivity(groupId, userId, "task_approved", "task", task._id.toString(), `${session.user.name} approved "${task.title}"`);
         if (task.assignedTo) {
           await notify(
             task.assignedTo.toString(),
@@ -194,6 +197,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ task
 
   task.deletedAt = new Date();
   await task.save();
+  await logActivity(group?._id?.toString() ?? "", session.user.id, "task_deleted", "task", task._id.toString(), `${session.user.name} deleted "${task.title}"`);
 
   return NextResponse.json({ ok: true });
 }

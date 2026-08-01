@@ -48,6 +48,8 @@ const TaskSchema = new Schema({
   ],
   createdAt: { type: Date, default: Date.now },
   deletedAt: { type: Date, default: null },
+  // Guards the deadline-reminder cron from notifying the same task twice.
+  deadlineReminderSentAt: { type: Date, default: null },
 });
 
 export type TaskDoc = mongoose.InferSchemaType<typeof TaskSchema> & { _id: mongoose.Types.ObjectId };

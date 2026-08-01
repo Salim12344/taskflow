@@ -15,6 +15,7 @@ type Project = { _id: string; name: string; description: string; status: string 
 type Member = { _id: string; userId: { _id: string; name: string; email: string; avatarUrl: string | null; lastActiveAt: string | null }; role: "admin" | "member" };
 type ReadReceipt = { userId: { _id: string; name: string; avatarUrl: string | null }; readAt: string };
 type ReplyTo = { messageId: string; text: string; senderName: string };
+type ActivityEntry = { _id: string; actorId: { name: string } | null; meta: { text: string }; createdAt: string };
 type GroupMessage = {
   _id: string; text: string; senderId: { _id: string; name: string; avatarUrl: string | null } | string;
   createdAt: string; isSystemMessage?: boolean; readBy: ReadReceipt[]; mentions: { _id: string; name: string }[];
@@ -40,11 +41,12 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   const router = useRouter();
   const { data: session } = useSession();
 
-  const [tab, setTab] = useState<"projects" | "chat" | "members">("projects");
+  const [tab, setTab] = useState<"projects" | "chat" | "members" | "activity">("projects");
   const [group, setGroup] = useState<Group | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [members, setMembers] = useState<Member[] | null>(null);
+  const [activity, setActivity] = useState<ActivityEntry[] | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [composer, setComposer] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +94,13 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
+
+  useEffect(() => {
+    if (tab !== "activity") return;
+    api<{ entries: ActivityEntry[] }>(`/api/groups/${groupId}/activity`)
+      .then((d) => setActivity(d.entries))
+      .catch((e) => setError(e.message));
+  }, [tab, groupId]);
 
   const me = members?.find((m) => m.userId._id === session?.user?.id);
   // Org owners are implicit admins of every group their org creates and never actually join
@@ -260,6 +269,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
           <div onClick={() => setTab("projects")} className={`tab-btn ${tab === "projects" ? "tab-active" : ""}`} style={{ background: tab === "projects" ? "var(--color-accent)" : "transparent", color: tab === "projects" ? "var(--color-bg)" : "inherit" }}>Projects</div>
           <div onClick={() => setTab("chat")} className={`tab-btn ${tab === "chat" ? "tab-active" : ""}`} style={{ borderLeft: "1px solid var(--color-divider)", background: tab === "chat" ? "var(--color-accent)" : "transparent", color: tab === "chat" ? "var(--color-bg)" : "inherit" }}>Chat</div>
           <div onClick={() => setTab("members")} className={`tab-btn ${tab === "members" ? "tab-active" : ""}`} style={{ borderLeft: "1px solid var(--color-divider)", background: tab === "members" ? "var(--color-accent)" : "transparent", color: tab === "members" ? "var(--color-bg)" : "inherit" }}>Members</div>
+          {isAdmin && <div onClick={() => setTab("activity")} className={`tab-btn ${tab === "activity" ? "tab-active" : ""}`} style={{ borderLeft: "1px solid var(--color-divider)", background: tab === "activity" ? "var(--color-accent)" : "transparent", color: tab === "activity" ? "var(--color-bg)" : "inherit" }}>Activity</div>}
         </div>
       </div>
 
@@ -481,6 +491,20 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
           </table>
           </div>
           {!isAdmin && <div style={{ fontSize: 12.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)", marginTop: 12 }}>Only admins can manage members.</div>}
+        </div>
+      )}
+
+      {tab === "activity" && isAdmin && (
+        <div className="page-pad" style={{ padding: "0 40px 40px" }}>
+          {activity?.length === 0 && <div className="card-meta">No activity yet.</div>}
+          <div className="card elev-sm" style={{ gap: 0 }}>
+            {activity?.map((a) => (
+              <div key={a._id} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "10px 12px", margin: "0 -12px", borderBottom: "1px solid var(--color-divider)" }}>
+                <span style={{ fontSize: 13.5 }}>{a.meta.text}</span>
+                <span className="mono" style={{ fontSize: 11, opacity: 0.6, flex: "none" }}>{new Date(a.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
