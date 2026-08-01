@@ -22,14 +22,19 @@ type GroupMessage = {
   replyTo: ReplyTo | null; attachments: Attachment[];
 };
 
-function renderWithMentions(text: string, mentions: { _id: string; name: string }[]) {
+function renderWithMentions(text: string, mentions: { _id: string; name: string }[], mine: boolean) {
   if (mentions.length === 0) return text;
   const names = mentions.map((m) => m.name).sort((a, b) => b.length - a.length);
   const pattern = new RegExp(`(@(?:${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")}))`, "g");
   const parts = text.split(pattern);
+  // A "mine" bubble is already accent-purple — coloring the mention the same purple makes it
+  // vanish into its own background, so it gets a contrast-safe highlight instead of a hue swap.
+  const mentionStyle: React.CSSProperties = mine
+    ? { background: "color-mix(in srgb, var(--color-bg) 22%, transparent)", borderRadius: 4, padding: "0 3px", fontWeight: 700 }
+    : { color: "var(--color-accent-300)", fontWeight: 600 };
   return parts.map((part, i) =>
     names.some((n) => part === `@${n}`) ? (
-      <span key={i} style={{ color: "var(--color-accent-300)", fontWeight: 600 }}>{part}</span>
+      <span key={i} style={mentionStyle}>{part}</span>
     ) : (
       <span key={i}>{part}</span>
     )
@@ -345,7 +350,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                           </div>
                         )}
                         {m.attachments?.map((a, i) => <div key={i} style={{ marginBottom: m.text ? 6 : 0 }}><AttachmentView attachment={a} mine={mine} /></div>)}
-                        {m.text && renderWithMentions(m.text, m.mentions)}
+                        {m.text && renderWithMentions(m.text, m.mentions, mine)}
                       </div>
                       <button
                         onClick={() => setReplyingTo({ _id: m._id, text: m.text || "📎 Attachment", senderName })}
@@ -375,9 +380,10 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
             </div>
           )}
           {replyingTo && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", marginTop: 10, background: "var(--color-bg)", borderRadius: 8, borderLeft: "3px solid var(--color-accent)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", marginTop: 10, background: "var(--color-bg)", borderRadius: 8 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-300)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none" }}><path d="M9 17l-5-5 5-5M4 12h10a5 5 0 015 5v2" /></svg>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 600 }}>Replying to {replyingTo.senderName}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-accent-300)" }}>{replyingTo.senderName}</div>
                 <div style={{ fontSize: 12, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
               </div>
               <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>

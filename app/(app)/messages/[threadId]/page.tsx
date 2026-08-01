@@ -188,9 +188,10 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
         <div ref={endRef} />
       </div>
       {replyingTo && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", marginTop: 12, background: "var(--color-bg)", borderRadius: 8, borderLeft: "3px solid var(--color-accent)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", marginTop: 12, background: "var(--color-bg)", borderRadius: 8 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-300)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none" }}><path d="M9 17l-5-5 5-5M4 12h10a5 5 0 015 5v2" /></svg>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 600 }}>Replying to {replyingTo._id && messages.find((m) => m._id === replyingTo._id)?.senderId === session?.user?.id ? "yourself" : otherName}</div>
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-accent-300)" }}>{replyingTo._id && messages.find((m) => m._id === replyingTo._id)?.senderId === session?.user?.id ? "yourself" : otherName}</div>
             <div style={{ fontSize: 12, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
           </div>
           <button onClick={() => setReplyingTo(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>

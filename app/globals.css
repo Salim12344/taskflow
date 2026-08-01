@@ -183,13 +183,10 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing:
 }
 
 .stat-number {
-  font-family: var(--font-heading);
+  font-family: var(--font-mono);
   font-size: 30px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--color-accent-300), var(--color-teal));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-weight: 500;
+  color: var(--color-accent-300);
 }
 
 .table-wrap { width: 100%; overflow-x: auto; }

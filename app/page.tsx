@@ -181,7 +181,7 @@ export default function HomePage() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 18 }}>
             {AUDIENCES.map((a) => (
-              <div key={a.title} className="card elev-sm" style={{ textAlign: "left", borderLeft: "3px solid var(--color-accent)" }}>
+              <div key={a.title} className="card elev-sm" style={{ textAlign: "left", boxShadow: "inset 0 2px 0 var(--color-accent), var(--shadow-sm)" }}>
                 <div className="card-title">{a.title}</div>
                 <div className="card-body">{a.desc}</div>
               </div>
