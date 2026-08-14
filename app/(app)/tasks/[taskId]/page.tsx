@@ -12,6 +12,7 @@ import { onKeyActivate } from "@/lib/a11y";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useStickToBottom } from "@/lib/use-stick-to-bottom";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { isOverdue } from "@/lib/deadline";
 
 type Task = {
   _id: string;
@@ -269,7 +270,10 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
           {task.deadline && (
             <div style={{ marginTop: 12 }}>
               <div style={{ fontSize: 12, color: "color-mix(in srgb, var(--color-text) 60%, transparent)", marginBottom: 4 }}>Due date</div>
-              <div style={{ fontSize: 14 }}>{new Date(task.deadline).toLocaleDateString()}</div>
+              <div style={{ fontSize: 14, color: isOverdue(task.deadline, task.status) ? "oklch(75% 0.15 25)" : undefined }}>
+                {new Date(task.deadline).toLocaleDateString()}
+                {isOverdue(task.deadline, task.status) && <span style={{ marginLeft: 6, fontSize: 11.5, fontWeight: 600 }}>Overdue</span>}
+              </div>
             </div>
           )}
 

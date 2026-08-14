@@ -7,6 +7,7 @@ import { api } from "@/lib/api-client";
 import { statusColorVar } from "@/lib/status";
 import { onKeyActivate } from "@/lib/a11y";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { isOverdue } from "@/lib/deadline";
 
 type Project = { _id: string; name: string; description: string; groupId: string };
 type Task = { _id: string; title: string; status: string; assignedTo: string | null; deadline: string | null };
@@ -77,7 +78,13 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
                   <div key={t._id} role="button" tabIndex={0} className="card elev-sm kanban-card status-tinted tf-card-in" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)} onKeyDown={onKeyActivate(() => router.push(`/tasks/${t._id}`))}>
                     <div className="card-title" style={{ fontSize: 14.5 }}>{t.title}</div>
                     <div className="card-meta">{nameFor(t.assignedTo)}</div>
-                    {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due <span className="mono">{new Date(t.deadline).toLocaleDateString()}</span></span></div>}
+                    {t.deadline && (
+                      <div className="card-meta">
+                        <span className={`tag ${isOverdue(t.deadline, t.status) ? "tag-danger" : "tag-outline"}`}>
+                          {isOverdue(t.deadline, t.status) ? "Overdue" : "Due"} <span className="mono">{new Date(t.deadline).toLocaleDateString()}</span>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {tasks && colTasks.length === 0 && <div className="card-meta">No tasks in this column.</div>}
@@ -99,7 +106,13 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
             <div key={t._id} className="card elev-sm kanban-card status-tinted tf-card-in" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)}>
               <div className="card-title" style={{ fontSize: 14.5 }}>{t.title}</div>
               <div className="card-meta">{nameFor(t.assignedTo)}</div>
-              {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due <span className="mono">{new Date(t.deadline).toLocaleDateString()}</span></span></div>}
+              {t.deadline && (
+                <div className="card-meta">
+                  <span className={`tag ${isOverdue(t.deadline, t.status) ? "tag-danger" : "tag-outline"}`}>
+                    {isOverdue(t.deadline, t.status) ? "Overdue" : "Due"} <span className="mono">{new Date(t.deadline).toLocaleDateString()}</span>
+                  </span>
+                </div>
+              )}
             </div>
           ))}
           {tasks && tasks.filter((t) => t.status === mobileStatus).length === 0 && (
