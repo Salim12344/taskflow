@@ -128,13 +128,18 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing:
    — the app's one consistent visual fingerprint for "where is this right now". */
 .status-rail { border-left: 3px solid var(--rail-color, var(--color-divider)); padding-left: 13px !important; }
 
-/* Kanban cards: the whole card carries a soft wash of its status color instead of just a rail —
-   bolder signal at a glance, still legible since it's a tint over the surface, not a solid fill. */
-.status-tinted {
-  background: color-mix(in srgb, var(--rail-color, var(--color-divider)) 10%, var(--color-surface)) !important;
-  border-color: color-mix(in srgb, var(--rail-color, var(--color-divider)) 30%, var(--color-divider)) !important;
+/* Kanban cards: the whole card fills solid with its status color — every status token sits at a
+   similar light oklch lightness, so one dark text color (the page background) reads clearly on
+   all four without needing a per-status text override. */
+.status-solid {
+  background: var(--rail-color, var(--color-divider)) !important;
+  border-color: transparent !important;
 }
-.status-tinted:hover { border-color: color-mix(in srgb, var(--rail-color, var(--color-divider)) 55%, var(--color-divider)) !important; }
+.status-solid:hover { filter: brightness(1.08); }
+.status-solid .card-title { color: var(--color-bg); }
+.status-solid .card-meta { color: color-mix(in srgb, var(--color-bg) 75%, transparent); }
+.status-solid .tag-outline { border-color: color-mix(in srgb, var(--color-bg) 45%, transparent); color: var(--color-bg); }
+.status-solid .tag-danger { background: color-mix(in srgb, var(--color-bg) 25%, transparent); color: var(--color-bg); }
 
 .row-hover { transition: background .12s ease; cursor: pointer; }
 .row-hover:hover { background: color-mix(in srgb, var(--color-text) 5%, transparent); }
