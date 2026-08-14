@@ -5,6 +5,7 @@ import { api } from "@/lib/api-client";
 import { resizeImageToDataUrl } from "@/lib/image";
 import { Avatar } from "@/components/Avatar";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { usePush } from "@/lib/use-push";
 
 type Me = { name: string; email: string; accountType: string; avatarUrl: string | null; showOnlineStatus: boolean };
 
@@ -24,6 +25,7 @@ const ADMIN_ONLY_PREFS = [
 ];
 
 export default function SettingsPage() {
+  const push = usePush();
   const [me, setMe] = useState<Me | null>(null);
   const [isAdminAnywhere, setIsAdminAnywhere] = useState(false);
   const [name, setName] = useState("");
@@ -134,6 +136,29 @@ export default function SettingsPage() {
           <button className="btn btn-primary" style={{ width: "fit-content" }} disabled={saving} onClick={save}>
             {saving ? "Saving…" : "Save"}
           </button>
+        </div>
+
+        <div className="card elev-sm">
+          <div className="card-title">Push notifications</div>
+          {push.supported ? (
+            <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", cursor: "pointer" }}>
+              <div>
+                <div style={{ fontSize: 13 }}>Notify this device</div>
+                <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>
+                  Get a notification here even when TaskFlow isn&rsquo;t open — assignments, reviews, mentions, and messages.
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={push.subscribed}
+                disabled={push.loading}
+                onChange={(e) => (e.target.checked ? push.subscribe() : push.unsubscribe())}
+                style={{ width: "auto", accentColor: "var(--color-accent)", flex: "none" }}
+              />
+            </label>
+          ) : (
+            <div className="card-meta">Push notifications aren&rsquo;t supported in this browser.</div>
+          )}
         </div>
 
         <div className="card elev-sm">
