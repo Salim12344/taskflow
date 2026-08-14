@@ -74,7 +74,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", paddingTop: 2 }}>
                 {colTasks.map((t) => (
-                  <div key={t._id} role="button" tabIndex={0} className="card elev-sm kanban-card status-rail tf-card-in" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)} onKeyDown={onKeyActivate(() => router.push(`/tasks/${t._id}`))}>
+                  <div key={t._id} role="button" tabIndex={0} className="card elev-sm kanban-card status-tinted tf-card-in" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)} onKeyDown={onKeyActivate(() => router.push(`/tasks/${t._id}`))}>
                     <div className="card-title" style={{ fontSize: 14.5 }}>{t.title}</div>
                     <div className="card-meta">{nameFor(t.assignedTo)}</div>
                     {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due <span className="mono">{new Date(t.deadline).toLocaleDateString()}</span></span></div>}
@@ -96,7 +96,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
         </select>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto" }}>
           {(tasks?.filter((t) => t.status === mobileStatus) ?? []).map((t) => (
-            <div key={t._id} className="card elev-sm kanban-card status-rail tf-card-in" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)}>
+            <div key={t._id} className="card elev-sm kanban-card status-tinted tf-card-in" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)}>
               <div className="card-title" style={{ fontSize: 14.5 }}>{t.title}</div>
               <div className="card-meta">{nameFor(t.assignedTo)}</div>
               {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due <span className="mono">{new Date(t.deadline).toLocaleDateString()}</span></span></div>}

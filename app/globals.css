@@ -128,6 +128,14 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing:
    — the app's one consistent visual fingerprint for "where is this right now". */
 .status-rail { border-left: 3px solid var(--rail-color, var(--color-divider)); padding-left: 13px !important; }
 
+/* Kanban cards: the whole card carries a soft wash of its status color instead of just a rail —
+   bolder signal at a glance, still legible since it's a tint over the surface, not a solid fill. */
+.status-tinted {
+  background: color-mix(in srgb, var(--rail-color, var(--color-divider)) 10%, var(--color-surface)) !important;
+  border-color: color-mix(in srgb, var(--rail-color, var(--color-divider)) 30%, var(--color-divider)) !important;
+}
+.status-tinted:hover { border-color: color-mix(in srgb, var(--rail-color, var(--color-divider)) 55%, var(--color-divider)) !important; }
+
 .row-hover { transition: background .12s ease; cursor: pointer; }
 .row-hover:hover { background: color-mix(in srgb, var(--color-text) 5%, transparent); }
 

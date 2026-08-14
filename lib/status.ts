@@ -9,3 +9,8 @@ export const STATUS_LABEL: Record<string, string> = {
 export function statusColorVar(status: string) {
   return `var(--status-${status}, var(--color-divider))`;
 }
+
+/** CSS var name for this status's pre-mixed background wash — see :root in globals.css. */
+export function statusBgVar(status: string) {
+  return `var(--status-${status}-bg, var(--color-surface))`;
+}
