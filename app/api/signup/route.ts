@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/db";
 import User from "@/models/User";
 import Organization from "@/models/Organization";
+import { generateSignupKey } from "@/lib/signup-key";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
   let organization = null;
   if (accountType === "organization") {
     try {
-      organization = await Organization.create({ name: orgName, regNumber, ownerId: user._id });
+      organization = await Organization.create({ name: orgName, regNumber, ownerId: user._id, signupKey: await generateSignupKey() });
     } catch (err) {
       await User.deleteOne({ _id: user._id });
       if (err instanceof Error && "code" in err && err.code === 11000) {
