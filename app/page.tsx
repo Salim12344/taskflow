@@ -56,8 +56,8 @@ const STEPS = [
 
 const STATS = [
   { n: "4", label: "task states, start to finish" },
-  { n: "2", label: "invite methods — email or link" },
   { n: "3", label: "chat layers: group, task, DM" },
+  { n: "2", label: "invite methods — email or link" },
   { n: "1", label: "place for all of it" },
 ];
 
@@ -97,31 +97,63 @@ export default function HomePage() {
           className="tf-fade"
           style={{
             display: "flex",
-            flexDirection: "column",
             alignItems: "center",
-            textAlign: "center",
-            padding: "88px 20px 64px",
-            background: "radial-gradient(ellipse 60% 50% at 50% 0%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent)",
+            justifyContent: "center",
+            gap: "clamp(24px, 5vw, 64px)",
+            flexWrap: "wrap",
+            padding: "88px clamp(20px, 5vw, 40px) 72px",
+            background:
+              "radial-gradient(ellipse 70% 60% at 20% -10%, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent), " +
+              "radial-gradient(ellipse 50% 40% at 100% 20%, color-mix(in srgb, var(--color-blue) 8%, transparent), transparent)",
           }}
         >
-          <div className="tag tag-accent" style={{ marginBottom: 18 }}>Groups · Projects · Tasks</div>
-          <h1 style={{ fontSize: 44, maxWidth: 680, lineHeight: 1.15, marginBottom: 18, letterSpacing: "-0.02em" }}>
-            Run your team&rsquo;s work without the group-chat chaos.
-          </h1>
-          <p style={{ maxWidth: 560, fontSize: 16, lineHeight: 1.6, color: "color-mix(in srgb, var(--color-text) 65%, transparent)", marginBottom: 30 }}>
-            TaskFlow combines group chat with structured projects and tasks —
-            invite-only membership, admin-reviewed task workflows, and private task threads,
-            all in one place.
-          </p>
-          <div style={{ display: "flex", gap: 12 }}>
-            {status === "authenticated" ? (
-              <Link className="btn btn-primary" href="/dashboard" style={{ padding: "10px 22px", fontSize: 14 }}>Go to dashboard</Link>
-            ) : (
-              <>
-                <Link className="btn btn-primary" href="/signup" style={{ padding: "10px 22px", fontSize: 14 }}>Get started</Link>
-                <Link className="btn btn-secondary" href="/login" style={{ padding: "10px 22px", fontSize: 14 }}>Log in</Link>
-              </>
-            )}
+          <div style={{ maxWidth: 560, textAlign: "left", flex: "1 1 420px" }}>
+            <div className="tag tag-accent" style={{ marginBottom: 18 }}>Groups · Projects · Tasks</div>
+            <h1 style={{ fontSize: "clamp(34px, 4.5vw, 48px)", lineHeight: 1.1, marginBottom: 18, letterSpacing: "-0.02em" }}>
+              Run your team&rsquo;s work without the group-chat chaos.
+            </h1>
+            <p style={{ fontSize: 16, lineHeight: 1.6, color: "color-mix(in srgb, var(--color-text) 65%, transparent)", marginBottom: 30 }}>
+              TaskFlow combines group chat with structured projects and tasks —
+              invite-only membership, admin-reviewed task workflows, and private task threads,
+              all in one place.
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              {status === "authenticated" ? (
+                <Link className="btn btn-primary" href="/dashboard" style={{ padding: "10px 22px", fontSize: 14 }}>Go to dashboard</Link>
+              ) : (
+                <>
+                  <Link className="btn btn-primary" href="/signup" style={{ padding: "10px 22px", fontSize: 14 }}>Get started</Link>
+                  <Link className="btn btn-secondary" href="/login" style={{ padding: "10px 22px", fontSize: 14 }}>Log in</Link>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Signature: a real slice of the actual Kanban board — same status-solid cards the
+              product uses, not a generic decorative graphic — so the hero shows product truth. */}
+          <div className="hero-board" style={{ position: "relative", flex: "1 1 320px", maxWidth: 380, minHeight: 260 }} aria-hidden="true">
+            {[
+              { title: "Payment integration", meta: "Chloe Yamamoto", status: "todo", rotate: -4, top: 0, left: 20 },
+              { title: "Refactor notification service", meta: "Due 7/26", status: "in_progress", rotate: 2, top: 70, left: 70 },
+              { title: "Mobile app QA pass", meta: "Approved", status: "done", rotate: -2, top: 150, left: 10 },
+            ].map((c) => (
+              <div
+                key={c.title}
+                className="card elev-sm status-solid hero-board-card"
+                style={{
+                  "--rail-color": `var(--status-${c.status})`,
+                  "--card-rotate": `${c.rotate}deg`,
+                  position: "absolute",
+                  top: c.top,
+                  left: c.left,
+                  width: 250,
+                  transform: `rotate(${c.rotate}deg)`,
+                } as React.CSSProperties}
+              >
+                <div className="card-title" style={{ fontSize: 14 }}>{c.title}</div>
+                <div className="card-meta">{c.meta}</div>
+              </div>
+            ))}
           </div>
         </section>
 

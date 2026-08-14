@@ -294,7 +294,19 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing:
   .responsive-table, .responsive-table tbody, .responsive-table tr, .responsive-table td { display: block; width: 100%; }
   .responsive-table tr { border: 1px solid var(--color-divider); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
   .responsive-table td { border-top: none !important; padding: 6px 0 !important; }
+
+  /* The absolutely-positioned card stack only has room to breathe on wider screens. */
+  .hero-board { display: none; }
 }
+
+@keyframes hero-card-in { from { opacity: 0; transform: translateY(14px) rotate(var(--card-rotate, 0deg)) scale(.96); } to { opacity: 1; transform: translateY(0) rotate(var(--card-rotate, 0deg)) scale(1); } }
+.hero-board-card {
+  animation: hero-card-in .5s cubic-bezier(.2, .8, .2, 1) both;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.hero-board-card:hover { transform: rotate(0deg) scale(1.03) !important; box-shadow: var(--shadow-md); z-index: 5; }
+.hero-board-card:nth-child(2) { animation-delay: .1s; }
+.hero-board-card:nth-child(3) { animation-delay: .2s; }
 
 .avatar {
   border-radius: 50%;
