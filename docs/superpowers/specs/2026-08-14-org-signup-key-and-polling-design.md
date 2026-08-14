@@ -1,4 +1,4 @@
-# Org signup key + app-wide polling
+# Org signup key, admin permissions, and app-wide polling
 
 ## 1. Org signup key
 
@@ -12,21 +12,55 @@ Today, joining an org happens only through per-group invite links. There's no se
 
 ### Signup flow
 - Add a third path to the signup form alongside the existing "Individual" and "Create an organization" options: **"Join an organization"**.
-- That path shows one field: the org key. On submit, `POST /api/signup` looks up `Organization.findOne({ signupKey })`; no match → 400 "Invalid organization key." Match → create the user with `orgId` set, `accountType: "individual"`, no group memberships.
+- That path shows one field: the org key. On submit, `POST /api/signup` looks up `Organization.findOne({ signupKey })`; no match → 400 "Invalid organization key." Match → create the user with `orgId` set, `accountType: "individual"`, no group memberships, and **`signupStatus: "pending"`** (see Approval gate below — a guessed-but-valid-looking key must not grant instant access).
 
-### Post-signup landing
-- A user with `orgId` set but zero group memberships doesn't fit the existing dashboard (which assumes either group membership or org ownership). They land on a lightweight "You're in — an admin will add you to a group soon" screen instead, until their first group membership exists (checked the same way the dashboard already checks "do I have any groups").
+### Approval gate
+A key alone isn't proof of identity — anyone who guesses or leaks a key could otherwise self-serve into the org. So joining via key doesn't grant access immediately:
+- `User` gets a new field `signupStatus: "pending" | "approved" | "rejected"` (default `"approved"` for individual/org-owner signups — the gate only applies to key-joiners).
+- A `pending` user can log in (so they get feedback) but sees only a "Your request to join **{org name}** is waiting on approval" screen — no dashboard, no data, nothing else in the app is reachable.
+- **Who can approve**: the org owner, or any admin whose permission checklist (see part 2, below) includes "Approve new sign-ups." Approving sets `signupStatus: "approved"`, which drops them into the existing "awaiting group assignment" screen from the flow above. Rejecting sets `signupStatus: "rejected"`.
+- **Rejected experience**: the account is not deleted. A rejected user who tries to log in sees "Your request to join **{org name}** was declined — contact an admin if you think this is a mistake" instead of the app shell. This is more transparent than silently vanishing the account, and gives them something concrete to act on.
+- New "Pending sign-ups" section on the org page (visible to the owner and to admins with the approve permission): lists pending `User` rows for this org with Approve/Reject buttons per row.
 
 ### Admin side
-- New "Org members" section on the org page, visible to the org owner: lists `User.find({ orgId: org._id })` — name, email, joined date, and whether they're in any group yet. Each row gets a shortcut into the existing per-group invite/add-member flow.
+- "Org members" section on the org page, visible to the org owner and to admins with the "see all org tasks" or "org-owner-level override" permission (both imply visibility into org membership): lists `User.find({ orgId: org._id, signupStatus: "approved" })` — name, email, joined date, and whether they're in any group yet. Each row gets a shortcut into the existing per-group invite/add-member flow.
 - Regenerate-key control lives on the same page, owner-only (matches existing owner-only patterns elsewhere in the org page).
 
 ### Explicitly out of scope
 - Joining an org via key from within the app later (e.g. a settings page) — signup-only for now.
 - Multiple/named keys, expiring keys — one standing key per org, regenerate-on-demand covers the "it leaked" case.
 - No change to per-group invite links; they remain the way admins add an org member (or anyone) to a specific group.
+- Re-requesting after a rejection (e.g. "try again with a new key") — a rejected user needs an admin to intervene directly; no self-serve retry.
 
-## 2. App-wide polling
+## 2. Admin permission checklist
+
+### Problem
+Every group admin has the same flat set of rights today. The org owner wants a way to deputize a specific admin with broader, org-wide reach — without handing over the ability to reshuffle who else is an admin, or to hand that same power to someone else. This needs to exist before the approval gate above is fully useful, since one of the three checklist items is "approve new sign-ups."
+
+### Data model
+- `GroupMember` (or a new org-scoped model — see decision below) gets a `permissions: string[]` field, subset of three fixed values: `"view_all_tasks"`, `"org_override"`, `"approve_signups"`. No open-ended/custom permissions — exactly these three, matching the user's explicit "no added abilities" instruction.
+- **Where this lives**: group admin status is per-`GroupMember` row (one per group), but these are *org-wide* permissions, not group-scoped. Storing them on `GroupMember` would mean re-granting per group, which contradicts "org-wide reach." Instead: add `orgPermissions: string[]` directly to `User` (only meaningful when the user is an admin somewhere under an org). Simpler than a new model, and mirrors how `orgId` already lives on `User`.
+- Only the org owner can read/write another user's `orgPermissions` — enforced the same way `signupKey` regeneration is owner-gated.
+
+### The three permissions
+1. **`view_all_tasks`** — read access to every task across every group in the org, not just groups they admin. Additive to `canManageTask`/`isGroupMember` checks: a user with this flag passes group-scoped read checks org-wide, but this is *view only* — it does not grant write/approve rights on tasks outside their own groups (that's `org_override`).
+2. **`org_override`** — extends the org owner's existing task-level override (`canManageTask`'s `isOrgOwnerOfGroup` check) to this user: approve/reject/delete/task-chat-write on any task, org-wide, same permanent-emergency-fallback semantics the owner already has. **Explicitly excluded**: this does not extend to `isGroupAdmin`-gated member-management actions (removing or demoting another admin) — those stay owner-only, checked separately (see below), regardless of this flag.
+3. **`approve_signups`** — can see and act on the "Pending sign-ups" list from part 1. Independent of the other two; an admin could have only this one.
+
+### The "can't touch other admins" boundary
+Regardless of `org_override`, a user is only allowed to demote/remove another *admin* (not a plain member — removing plain members stays a normal admin action, unaffected) if `isOrgOwnerOfGroup` is true for them — i.e., only the actual owner, checked via `Organization.ownerId`, never via `orgPermissions`. This is a hardcoded exception in `hasAnotherAdmin`/the member-removal route's admin-target check, not a fourth permission — nothing in `orgPermissions` can ever unlock it, closing off the "cascade the same power further" risk by construction rather than by convention.
+
+Promoting a *plain member* to admin is unaffected by any of this — an `org_override` admin can already do that today (existing per-group admin promotion), and the promoted admin gets the plain default role with an empty `orgPermissions: []` — extended permissions never propagate automatically.
+
+### UI
+- On the org page's member list (the "Org members" section from part 1, or the existing per-group Members tab — whichever the org owner is looking at an admin from), an admin row gets a "Permissions" control, owner-only, opening a small checklist (3 checkboxes, the items above) that PATCHes `User.orgPermissions` for that user.
+- Not visible/editable by anyone except the owner, including admins who themselves have `org_override` — matches the earlier decision that checklist control is owner-only, full stop.
+
+### Explicitly out of scope
+- Any permission beyond the three listed. No custom/named permission sets, no per-group grant of these (they're org-wide only).
+- Extended-permission admins granting or revoking `orgPermissions` on anyone, including themselves.
+
+## 3. App-wide polling
 
 ### Problem
 Chat pages (group chat, DM threads, task chat), the DM inbox, and the sidebar DM list already poll every 1.5–5s so they feel live. Every other data page (dashboard, Kanban board, review queue, notifications, org page, and the group page's Members/Projects/Activity tabs) is fetch-once-on-mount — a teammate's change doesn't show up until the viewer manually reloads. The user wants the whole app to feel uniformly instant, not chat-fast-and-everything-else-slow.
