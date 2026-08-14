@@ -7,12 +7,12 @@ import { generateSignupKey } from "@/lib/signup-key";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { email, password, name, accountType, orgName, regNumber } = body;
+  const { email, password, name, accountType, orgName, regNumber, joinKey } = body;
 
   if (!email || !password || !name || !accountType) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
-  if (!["individual", "organization"].includes(accountType)) {
+  if (!["individual", "organization", "join"].includes(accountType)) {
     return NextResponse.json({ error: "Invalid accountType" }, { status: 400 });
   }
   if (accountType === "organization") {
@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
     if (!/^\d{6}$/.test(regNumber ?? "")) {
       return NextResponse.json({ error: "regNumber must be exactly 6 digits" }, { status: 400 });
     }
+  }
+  if (accountType === "join" && !/^\d{6}$/.test(joinKey ?? "")) {
+    return NextResponse.json({ error: "Organization key must be exactly 6 digits" }, { status: 400 });
   }
 
   await connectDB();
@@ -38,12 +41,24 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  let joinOrg = null;
+  if (accountType === "join") {
+    joinOrg = await Organization.findOne({ signupKey: joinKey });
+    if (!joinOrg) {
+      return NextResponse.json({ error: "Invalid organization key" }, { status: 400 });
+    }
+  }
+
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await User.create({
     email: email.toLowerCase(),
     passwordHash,
     name,
-    accountType,
+    // A key alone isn't identity verification, so this stays a plain "individual" account —
+    // it must never inherit the implicit org-admin rights accountType: "organization" grants.
+    accountType: accountType === "join" ? "individual" : accountType,
+    orgId: joinOrg?._id ?? null,
+    signupStatus: joinOrg ? "pending" : "approved",
   });
 
   let organization = null;
@@ -61,7 +76,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(
     {
-      user: { id: user._id, email: user.email, name: user.name, accountType: user.accountType },
+      user: { id: user._id, email: user.email, name: user.name, accountType: user.accountType, signupStatus: user.signupStatus },
       organization: organization ? { id: organization._id, name: organization.name } : null,
     },
     { status: 201 }

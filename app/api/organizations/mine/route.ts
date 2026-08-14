@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { connectDB } from "@/lib/db";
 import Organization from "@/models/Organization";
 import Group from "@/models/Group";
+import User from "@/models/User";
 
 export async function GET() {
   const session = await auth();
@@ -13,6 +14,7 @@ export async function GET() {
   if (!org) return NextResponse.json({ error: "You don't own an organization" }, { status: 404 });
 
   const groups = await Group.find({ orgId: org._id, deletedAt: null });
+  const pendingSignups = await User.find({ orgId: org._id, signupStatus: "pending" }, "name email createdAt");
 
-  return NextResponse.json({ organization: org, groups });
+  return NextResponse.json({ organization: org, groups, pendingSignups });
 }

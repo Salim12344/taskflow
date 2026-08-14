@@ -5,6 +5,8 @@ declare module "next-auth" {
     user: {
       id: string;
       accountType: "individual" | "organization";
+      signupStatus: "approved" | "pending" | "rejected";
+      orgId: string | null;
     } & DefaultSession["user"];
   }
 }

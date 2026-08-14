@@ -6,9 +6,10 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { api } from "@/lib/api-client";
 import { useViewportHeight } from "@/lib/use-viewport-height";
+import { SignupStatusGate } from "@/components/SignupStatusGate";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { status } = useSession();
+  const { status, data: session } = useSession();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const viewportHeight = useViewportHeight();
@@ -46,6 +47,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         Loading…
       </div>
     );
+  }
+
+  if (session?.user.signupStatus === "pending" || session?.user.signupStatus === "rejected") {
+    return <SignupStatusGate status={session.user.signupStatus} />;
   }
 
   return (

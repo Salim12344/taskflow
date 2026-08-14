@@ -30,6 +30,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           accountType: user.accountType,
+          signupStatus: user.signupStatus,
         };
       },
     }),
@@ -58,6 +59,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         await connectDB();
         const dbUser = await User.findById(user.id);
         token.accountType = dbUser?.accountType;
+        token.signupStatus = dbUser?.signupStatus;
+        token.orgId = dbUser?.orgId?.toString() ?? null;
       }
       return token;
     },
@@ -65,6 +68,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.accountType = token.accountType as "individual" | "organization";
+        session.user.signupStatus = (token.signupStatus as "approved" | "pending" | "rejected") ?? "approved";
+        session.user.orgId = (token.orgId as string | null) ?? null;
       }
       return session;
     },

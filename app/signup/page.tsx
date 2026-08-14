@@ -10,9 +10,10 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [accountType, setAccountType] = useState<"individual" | "organization">("individual");
+  const [accountType, setAccountType] = useState<"individual" | "organization" | "join">("individual");
   const [orgName, setOrgName] = useState("");
   const [regNumber, setRegNumber] = useState("");
+  const [joinKey, setJoinKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -30,6 +31,7 @@ export default function SignupPage() {
         accountType,
         orgName: accountType === "organization" ? orgName : undefined,
         regNumber: accountType === "organization" ? regNumber : undefined,
+        joinKey: accountType === "join" ? joinKey : undefined,
       }),
     });
     if (!res.ok) {
@@ -69,9 +71,10 @@ export default function SignupPage() {
           </div>
           <div className="field">
             <label>Account type</label>
-            <select className="input" value={accountType} onChange={(e) => setAccountType(e.target.value as "individual" | "organization")}>
+            <select className="input" value={accountType} onChange={(e) => setAccountType(e.target.value as "individual" | "organization" | "join")}>
               <option value="individual">Individual</option>
-              <option value="organization">Organization</option>
+              <option value="organization">Create an organization</option>
+              <option value="join">Join an organization</option>
             </select>
           </div>
           {accountType === "organization" && (
@@ -94,6 +97,22 @@ export default function SignupPage() {
                 />
               </div>
             </>
+          )}
+          {accountType === "join" && (
+            <div className="field">
+              <label>Organization key</label>
+              <input
+                className="input"
+                required
+                inputMode="numeric"
+                pattern="\d{6}"
+                maxLength={6}
+                placeholder="6-digit key from your org admin"
+                value={joinKey}
+                onChange={(e) => setJoinKey(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+              <div className="card-meta" style={{ marginTop: 6 }}>Ask your org admin for this. An admin will approve your request before you can access anything.</div>
+            </div>
           )}
           {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 12.5 }}>{error}</div>}
           <button className="btn btn-primary btn-block" disabled={loading} type="submit">

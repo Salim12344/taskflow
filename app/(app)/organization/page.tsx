@@ -8,21 +8,24 @@ import { onKeyActivate } from "@/lib/a11y";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
-type Org = { _id: string; name: string; regNumber: string; groupCreators: { _id: string; name: string; email: string }[] };
+type Org = { _id: string; name: string; regNumber: string; signupKey: string; groupCreators: { _id: string; name: string; email: string }[] };
 type Group = { _id: string; name: string };
+type PendingSignup = { _id: string; name: string; email: string; createdAt: string };
 
 export default function OrganizationPage() {
   const router = useRouter();
   const [org, setOrg] = useState<Org | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [pendingSignups, setPendingSignups] = useState<PendingSignup[]>([]);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [notOwner, setNotOwner] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<{ _id: string; name: string } | null>(null);
+  const [regeneratingKey, setRegeneratingKey] = useState(false);
 
   function load() {
-    api<{ organization: Org; groups: Group[] }>("/api/organizations/mine")
-      .then((d) => { setOrg(d.organization); setGroups(d.groups); setError(null); })
+    api<{ organization: Org; groups: Group[]; pendingSignups: PendingSignup[] }>("/api/organizations/mine")
+      .then((d) => { setOrg(d.organization); setGroups(d.groups); setPendingSignups(d.pendingSignups); setError(null); })
       .catch((e) => {
         if (e.message.includes("don't own")) setNotOwner(true);
         else setError(e);
@@ -30,6 +33,27 @@ export default function OrganizationPage() {
   }
 
   useEffect(load, []);
+
+  async function regenerateKey() {
+    setRegeneratingKey(true);
+    try {
+      const { signupKey } = await api<{ signupKey: string }>("/api/organizations/mine/signup-key", { method: "POST" });
+      setOrg((o) => (o ? { ...o, signupKey } : o));
+    } catch (e) {
+      setError(e);
+    } finally {
+      setRegeneratingKey(false);
+    }
+  }
+
+  async function respondToSignup(userId: string, approve: boolean) {
+    try {
+      await api(`/api/organizations/mine/pending-signups/${userId}`, { method: "PATCH", body: JSON.stringify({ approve }) });
+      load();
+    } catch (e) {
+      setError(e);
+    }
+  }
 
   async function addCreator(e: React.FormEvent) {
     e.preventDefault();
@@ -71,6 +95,42 @@ export default function OrganizationPage() {
       <ErrorBanner error={error} onRetry={load} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 20 }}>
+        <div className="card elev-sm">
+          <div className="card-title">Signup key</div>
+          <div className="card-body">
+            Give this to new hires — they enter it at signup to request joining {org?.name ?? "your org"}. You still approve each request before they get in.
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="mono" style={{ fontSize: 22, fontWeight: 600, letterSpacing: "0.08em", padding: "8px 14px", background: "var(--color-bg)", borderRadius: 8 }}>
+              {org?.signupKey ?? "……"}
+            </div>
+            <button className="btn btn-secondary" disabled={regeneratingKey} onClick={regenerateKey}>
+              {regeneratingKey ? "Regenerating…" : "Regenerate"}
+            </button>
+          </div>
+        </div>
+
+        {pendingSignups.length > 0 && (
+          <div className="card elev-sm">
+            <div className="card-title">Pending sign-ups ({pendingSignups.length})</div>
+            <div className="card-body">People who entered your signup key and are waiting on approval.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {pendingSignups.map((u) => (
+                <div key={u._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--color-divider)" }}>
+                  <div>
+                    <div style={{ fontSize: 13.5 }}>{u.name}</div>
+                    <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{u.email}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="btn btn-primary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => respondToSignup(u._id, true)}>Approve</button>
+                    <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12, color: "oklch(70% 0.15 25)" }} onClick={() => respondToSignup(u._id, false)}>Decline</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="card elev-sm">
           <div className="card-title">Groups</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
