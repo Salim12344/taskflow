@@ -10,7 +10,9 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [accountType, setAccountType] = useState<"individual" | "organization" | "join">("individual");
+  const [signupPath, setSignupPath] = useState<"individual" | "org">("individual");
+  const [orgMode, setOrgMode] = useState<"organization" | "join">("organization");
+  const accountType = signupPath === "individual" ? "individual" : orgMode;
   const [orgName, setOrgName] = useState("");
   const [regNumber, setRegNumber] = useState("");
   const [joinKey, setJoinKey] = useState("");
@@ -70,13 +72,35 @@ export default function SignupPage() {
             <input className="input" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           <div className="field">
-            <label>Account type</label>
-            <select className="input" value={accountType} onChange={(e) => setAccountType(e.target.value as "individual" | "organization" | "join")}>
-              <option value="individual">Individual</option>
-              <option value="organization">Create an organization</option>
-              <option value="join">Join an organization</option>
-            </select>
+            <label>I&rsquo;m signing up as</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className={`btn ${signupPath === "individual" ? "btn-primary" : "btn-secondary"}`}
+                style={{ flex: 1 }}
+                onClick={() => setSignupPath("individual")}
+              >
+                Individual
+              </button>
+              <button
+                type="button"
+                className={`btn ${signupPath === "org" ? "btn-primary" : "btn-secondary"}`}
+                style={{ flex: 1 }}
+                onClick={() => setSignupPath("org")}
+              >
+                Organization
+              </button>
+            </div>
           </div>
+          {signupPath === "org" && (
+            <div className="field">
+              <label>Organization setup</label>
+              <select className="input" value={orgMode} onChange={(e) => setOrgMode(e.target.value as "organization" | "join")}>
+                <option value="organization">Create an organization</option>
+                <option value="join">Join an organization</option>
+              </select>
+            </div>
+          )}
           {accountType === "organization" && (
             <>
               <div className="field">
