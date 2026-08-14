@@ -20,7 +20,9 @@ export async function notify(
     description: opts?.description ?? null,
     payload: opts?.payload ?? {},
   });
-  sendPush(userId, "TaskFlow", text, pushUrlFor(opts?.payload)).catch(() => {});
+  // Must be awaited, not fired-and-forgotten — on serverless, the function can freeze the
+  // instant the route's response is sent, killing any still-in-flight unawaited promise.
+  await sendPush(userId, "TaskFlow", text, pushUrlFor(opts?.payload)).catch(() => {});
   return notification;
 }
 
