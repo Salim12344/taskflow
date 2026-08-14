@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api-client";
 import { resizeImageToDataUrl } from "@/lib/image";
 import { Avatar } from "@/components/Avatar";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type Me = { name: string; email: string; accountType: string; avatarUrl: string | null; showOnlineStatus: boolean };
 
@@ -29,7 +30,7 @@ export default function SettingsPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
   const [prefs, setPrefs] = useState<boolean[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -46,7 +47,7 @@ export default function SettingsPage() {
         const visiblePrefs = d.isAdminAnywhere ? [...base, ...ADMIN_ONLY_PREFS] : base;
         setPrefs(visiblePrefs.map(() => true));
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e));
   }, []);
 
   const base = me?.accountType === "organization" ? PERSONAL_PREFS : [GROUP_JOINED_PREF, ...PERSONAL_PREFS];
@@ -60,7 +61,7 @@ export default function SettingsPage() {
       const dataUrl = await resizeImageToDataUrl(file);
       setAvatarUrl(dataUrl);
     } catch (err) {
-      setError((err as Error).message);
+      setError(err);
     }
   }
 
@@ -73,7 +74,7 @@ export default function SettingsPage() {
       setSaved(true);
       window.dispatchEvent(new Event("taskflow:profile-changed"));
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     } finally {
       setSaving(false);
     }
@@ -127,7 +128,7 @@ export default function SettingsPage() {
             />
           </label>
 
-          {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 12.5 }}>{error}</div>}
+          <ErrorBanner error={error} />
           {saved && <div style={{ color: "var(--color-accent-300)", fontSize: 12.5 }}>Saved.</div>}
 
           <button className="btn btn-primary" style={{ width: "fit-content" }} disabled={saving} onClick={save}>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type Notif = {
   _id: string;
@@ -33,12 +34,12 @@ function destinationFor(n: Notif): string | null {
 export default function NotificationsPage() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notif[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   function load() {
     api<{ notifications: Notif[] }>("/api/notifications")
-      .then((d) => setNotifications(d.notifications))
-      .catch((e) => setError(e.message));
+      .then((d) => { setNotifications(d.notifications); setError(null); })
+      .catch((e) => setError(e));
   }
 
   useEffect(load, []);
@@ -49,7 +50,7 @@ export default function NotificationsPage() {
       window.dispatchEvent(new Event("taskflow:notifications-changed"));
       load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
@@ -69,7 +70,7 @@ export default function NotificationsPage() {
         <h2>Notifications</h2>
         <button className="btn btn-secondary" style={{ padding: "5px 12px", fontSize: 12 }} onClick={markAllRead}>Mark all read</button>
       </div>
-      {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
+      <ErrorBanner error={error} onRetry={load} />
       {notifications?.length === 0 && <div className="card-meta">Nothing yet.</div>}
       <div className="card elev-sm" style={{ gap: 0 }}>
         {notifications?.map((n) => (

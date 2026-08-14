@@ -10,6 +10,7 @@ import { useVoiceRecorder } from "@/lib/use-voice-recorder";
 import { isOnline, formatLastSeen } from "@/lib/presence";
 import { onKeyActivate } from "@/lib/a11y";
 import { useStickToBottom } from "@/lib/use-stick-to-bottom";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type ReplyTo = { messageId: string; text: string; senderName: string };
 type Message = { _id: string; text: string; senderId: string; createdAt: string; readAt: string | null; replyTo: ReplyTo | null; attachments: Attachment[] };
@@ -27,7 +28,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
   const [otherLastActive, setOtherLastActive] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
   const [otherTyping, setOtherTyping] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [replyingTo, setReplyingTo] = useState<{ _id: string; text: string } | null>(null);
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const voice = useVoiceRecorder();
@@ -37,8 +38,8 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
 
   function loadMessages() {
     api<{ messages: Message[]; otherTyping: boolean }>(`/api/dm/${threadId}/messages`)
-      .then((d) => { setMessages(d.messages); setOtherTyping(d.otherTyping); })
-      .catch((e) => setError(e.message));
+      .then((d) => { setMessages(d.messages); setOtherTyping(d.otherTyping); setError(null); })
+      .catch((e) => setError(e));
   }
 
   function onComposerChange(value: string) {
@@ -72,27 +73,31 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
   async function sendMessage() {
     if (!composer.trim()) return;
     const text = composer;
+    const reply = replyingTo;
     setComposer("");
-    const replyToId = replyingTo?._id;
     setReplyingTo(null);
     try {
-      await api(`/api/dm/${threadId}/messages`, { method: "POST", body: JSON.stringify({ text, replyToId }) });
+      await api(`/api/dm/${threadId}/messages`, { method: "POST", body: JSON.stringify({ text, replyToId: reply?._id }) });
       loadMessages();
     } catch (e) {
-      setError((e as Error).message);
+      // Restore what was typed — losing a message to a network blip on top of the failure is worse than the failure itself.
+      setComposer(text);
+      setReplyingTo(reply);
+      setError(e);
     }
   }
 
   async function sendAttachment(file: Blob, filename: string) {
     setSendingAttachment(true);
-    const replyToId = replyingTo?._id;
+    const reply = replyingTo;
     setReplyingTo(null);
     try {
       const attachment = await uploadFile(file, filename);
-      await api(`/api/dm/${threadId}/messages`, { method: "POST", body: JSON.stringify({ text: "", attachments: [attachment], replyToId }) });
+      await api(`/api/dm/${threadId}/messages`, { method: "POST", body: JSON.stringify({ text: "", attachments: [attachment], replyToId: reply?._id }) });
       loadMessages();
     } catch (e) {
-      setError((e as Error).message);
+      setReplyingTo(reply);
+      setError(e);
     } finally {
       setSendingAttachment(false);
     }
@@ -132,7 +137,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
           </div>
         </div>
       </div>
-      {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
+      <ErrorBanner error={error} onRetry={loadMessages} />
 
       <div ref={chatContainerRef} onScroll={onChatScroll} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
         {messages.length === 0 && <div className="card-meta">No messages yet. Say hello.</div>}
@@ -181,7 +186,7 @@ export default function DmThreadPage({ params }: { params: Promise<{ threadId: s
             <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-accent-300)" }}>{replyingTo._id && messages.find((m) => m._id === replyingTo._id)?.senderId === session?.user?.id ? "yourself" : otherName}</div>
             <div style={{ fontSize: 12, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
           </div>
-          <button onClick={() => setReplyingTo(null)} aria-label="Cancel reply" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
+          <button className="btn btn-icon" onClick={() => setReplyingTo(null)} aria-label="Cancel reply" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6 }}>×</button>
         </div>
       )}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>

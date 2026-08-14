@@ -4,6 +4,7 @@ import { useEffect, useState, use as usePromise } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { onKeyActivate } from "@/lib/a11y";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type Project = { _id: string; name: string; groupId: string };
 type Member = { userId: { _id: string; name: string }; role: "admin" | "member" };
@@ -18,7 +19,7 @@ export default function NewTaskPage({ params }: { params: Promise<{ projectId: s
   const [assignedTo, setAssignedTo] = useState("");
   const [deadline, setDeadline] = useState("");
   const [recurrence, setRecurrence] = useState("none");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     api<{ project: Project }>(`/api/projects/${projectId}`)
@@ -27,7 +28,7 @@ export default function NewTaskPage({ params }: { params: Promise<{ projectId: s
         return api<{ members: Member[] }>(`/api/groups/${d.project.groupId}/members`);
       })
       .then((d) => setMembers(d.members))
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e));
   }, [projectId]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -45,7 +46,7 @@ export default function NewTaskPage({ params }: { params: Promise<{ projectId: s
       });
       router.push(`/projects/${projectId}`);
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
@@ -78,7 +79,7 @@ export default function NewTaskPage({ params }: { params: Promise<{ projectId: s
               <option value="monthly">Monthly</option>
             </select>
           </div>
-          {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 12.5 }}>{error}</div>}
+          <ErrorBanner error={error} />
           <button className="btn btn-primary btn-block" type="submit">Create task</button>
         </form>
       </div>

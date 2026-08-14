@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { groupIcon } from "@/lib/group-icon";
 import { onKeyActivate } from "@/lib/a11y";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type Group = { _id: string; name: string; orgId: string | null };
 
@@ -12,15 +13,16 @@ export default function DashboardPage() {
   const router = useRouter();
   const [canCreateGroups, setCanCreateGroups] = useState(false);
   const [groups, setGroups] = useState<Group[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
 
   function load() {
+    setError(null);
     api<{ groups: Group[] }>("/api/groups")
       .then((d) => setGroups(d.groups))
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e));
     api<{ canCreateGroups: boolean }>("/api/me")
       .then((d) => setCanCreateGroups(d.canCreateGroups))
       .catch(() => {});
@@ -41,7 +43,7 @@ export default function DashboardPage() {
       window.dispatchEvent(new Event("taskflow:groups-changed"));
       router.push(`/groups/${group._id}`);
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     } finally {
       setCreating(false);
     }
@@ -64,7 +66,7 @@ export default function DashboardPage() {
         </form>
       )}
 
-      {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
+      <ErrorBanner error={error} onRetry={load} />
 
       {groups === null && !error && <div className="card-meta">Loading…</div>}
       {groups?.length === 0 && (

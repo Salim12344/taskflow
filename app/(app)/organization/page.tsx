@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { groupIcon } from "@/lib/group-icon";
 import { onKeyActivate } from "@/lib/a11y";
+import { ErrorBanner } from "@/components/ErrorBanner";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Org = { _id: string; name: string; regNumber: string; groupCreators: { _id: string; name: string; email: string }[] };
 type Group = { _id: string; name: string };
@@ -14,15 +16,16 @@ export default function OrganizationPage() {
   const [org, setOrg] = useState<Org | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [notOwner, setNotOwner] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<{ _id: string; name: string } | null>(null);
 
   function load() {
     api<{ organization: Org; groups: Group[] }>("/api/organizations/mine")
-      .then((d) => { setOrg(d.organization); setGroups(d.groups); })
+      .then((d) => { setOrg(d.organization); setGroups(d.groups); setError(null); })
       .catch((e) => {
         if (e.message.includes("don't own")) setNotOwner(true);
-        else setError(e.message);
+        else setError(e);
       });
   }
 
@@ -36,16 +39,17 @@ export default function OrganizationPage() {
       setEmail("");
       load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
   async function removeCreator(userId: string) {
+    setConfirmRemove(null);
     try {
       await api(`/api/organizations/mine/creators/${userId}`, { method: "DELETE" });
       load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
@@ -64,7 +68,7 @@ export default function OrganizationPage() {
       <div style={{ fontSize: 13, color: "color-mix(in srgb, var(--color-text) 55%, transparent)", marginBottom: 22 }}>
         Registration #{org?.regNumber}
       </div>
-      {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
+      <ErrorBanner error={error} onRetry={load} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 20 }}>
         <div className="card elev-sm">
@@ -97,7 +101,7 @@ export default function OrganizationPage() {
                   <div style={{ fontSize: 13.5 }}>{u.name}</div>
                   <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{u.email}</div>
                 </div>
-                <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12, color: "var(--color-accent-300)" }} onClick={() => removeCreator(u._id)}>
+                <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12, color: "oklch(70% 0.15 25)" }} onClick={() => setConfirmRemove({ _id: u._id, name: u.name })}>
                   Remove
                 </button>
               </div>
@@ -110,6 +114,17 @@ export default function OrganizationPage() {
           </form>
         </div>
       </div>
+
+      {confirmRemove && (
+        <ConfirmDialog
+          title="Revoke group-creator permission?"
+          description={`${confirmRemove.name} will no longer be able to create groups under this org. Any groups they already created and admin stay untouched.`}
+          confirmLabel="Revoke"
+          danger
+          onConfirm={() => removeCreator(confirmRemove._id)}
+          onCancel={() => setConfirmRemove(null)}
+        />
+      )}
     </div>
   );
 }

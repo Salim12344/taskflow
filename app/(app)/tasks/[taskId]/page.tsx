@@ -11,6 +11,7 @@ import { statusColorVar } from "@/lib/status";
 import { onKeyActivate } from "@/lib/a11y";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useStickToBottom } from "@/lib/use-stick-to-bottom";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type Task = {
   _id: string;
@@ -46,7 +47,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   const [task, setTask] = useState<Task | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showReject, setShowReject] = useState(false);
   const [delegateTarget, setDelegateTarget] = useState("");
@@ -56,6 +57,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   const [replyingTo, setReplyingTo] = useState<{ _id: string; text: string; senderName: string } | null>(null);
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const voice = useVoiceRecorder();
   const { containerRef: chatContainerRef, endRef: chatEndRef, onScroll: onChatScroll } = useStickToBottom(chatMessages);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -70,8 +72,8 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
         setProject(d.project);
         return api<{ members: Member[] }>(`/api/groups/${d.project.groupId}/members`);
       })
-      .then((d) => setMembers(d.members))
-      .catch((e) => setError(e.message));
+      .then((d) => { setMembers(d.members); setError(null); })
+      .catch((e) => setError(e));
   }
 
   useEffect(load, [taskId]);
@@ -114,13 +116,17 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   const isDelegationTarget = !!delegation && delegation.toUserId === userId;
 
   async function moveStatus(status: string, reason?: string) {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       await api(`/api/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ status, reason }) });
       setShowReject(false);
       setRejectReason("");
       load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -129,7 +135,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
       await api(`/api/tasks/${taskId}/subtasks`, { method: "PATCH", body: JSON.stringify({ index, done }) });
       load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
@@ -139,63 +145,78 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
       await api(`/api/tasks/${taskId}`, { method: "DELETE" });
       router.push(`/projects/${task?.projectId}`);
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
   async function sendDelegate() {
-    if (!delegateTarget) return;
+    if (!delegateTarget || submitting) return;
+    setSubmitting(true);
     try {
       await api(`/api/tasks/${taskId}/delegate-review`, { method: "POST", body: JSON.stringify({ toUserId: delegateTarget }) });
       setDelegateTarget("");
       load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function cancelDelegate() {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       await api(`/api/tasks/${taskId}/delegate-review`, { method: "DELETE" });
       load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function respondToDelegate(accept: boolean) {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       await api(`/api/tasks/${taskId}/delegate-review/respond`, { method: "POST", body: JSON.stringify({ accept }) });
       load();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function sendChatMessage() {
     if (!composer.trim()) return;
     const text = composer;
+    const reply = replyingTo;
     setComposer("");
-    const replyToId = replyingTo?._id;
     setReplyingTo(null);
     try {
-      await api(`/api/tasks/${taskId}/chat`, { method: "POST", body: JSON.stringify({ text, replyToId }) });
+      await api(`/api/tasks/${taskId}/chat`, { method: "POST", body: JSON.stringify({ text, replyToId: reply?._id }) });
       loadChat();
     } catch (e) {
-      setError((e as Error).message);
+      // Restore what was typed — losing a message to a network blip on top of the failure is worse than the failure itself.
+      setComposer(text);
+      setReplyingTo(reply);
+      setError(e);
     }
   }
 
   async function sendAttachment(file: Blob, filename: string) {
     setSendingAttachment(true);
-    const replyToId = replyingTo?._id;
+    const reply = replyingTo;
     setReplyingTo(null);
     try {
       const attachment = await uploadFile(file, filename);
-      await api(`/api/tasks/${taskId}/chat`, { method: "POST", body: JSON.stringify({ text: "", attachments: [attachment], replyToId }) });
+      await api(`/api/tasks/${taskId}/chat`, { method: "POST", body: JSON.stringify({ text: "", attachments: [attachment], replyToId: reply?._id }) });
       loadChat();
     } catch (e) {
-      setError((e as Error).message);
+      setReplyingTo(reply);
+      setError(e);
     } finally {
       setSendingAttachment(false);
     }
@@ -218,7 +239,11 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   }
 
   if (!task) {
-    return <div className="tf-fade page-pad" style={{ padding: "24px 40px" }}>{error ?? "Loading…"}</div>;
+    return (
+      <div className="tf-fade page-pad" style={{ padding: "24px 40px" }}>
+        {error ? <ErrorBanner error={error} onRetry={load} /> : "Loading…"}
+      </div>
+    );
   }
 
   return (
@@ -230,7 +255,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
         <h3>{task.title}</h3>
         <span className="tag" style={{ background: `color-mix(in srgb, ${statusColorVar(task.status)} 18%, transparent)`, color: statusColorVar(task.status) }}>{STATUS_LABEL[task.status]}</span>
       </div>
-      {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
+      <ErrorBanner error={error} onRetry={load} />
 
       <div className="detail-grid-2col" style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 24, alignItems: "start" }}>
         <div className="card elev-sm">
@@ -259,15 +284,15 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                       {nameFor(delegation.fromUserId)} wants to hand off this task to you — you&rsquo;d edit, reassign, delete, and approve/reject it going forward.
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button className="btn btn-primary" style={{ padding: "4px 10px", fontSize: 12.5 }} onClick={() => respondToDelegate(true)}>Accept</button>
-                      <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12.5 }} onClick={() => respondToDelegate(false)}>Decline</button>
+                      <button className="btn btn-primary" style={{ padding: "4px 10px", fontSize: 12.5 }} disabled={submitting} onClick={() => respondToDelegate(true)}>Accept</button>
+                      <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12.5 }} disabled={submitting} onClick={() => respondToDelegate(false)}>Decline</button>
                     </div>
                   </div>
                 ) : (
                   <div style={{ fontSize: 13.5 }}>
                     Hand-off pending — waiting on {nameFor(delegation.toUserId)} to accept.
                     {delegation.fromUserId === userId && (
-                      <button className="btn btn-secondary" style={{ marginLeft: 8, padding: "2px 8px", fontSize: 12 }} onClick={cancelDelegate}>Cancel</button>
+                      <button className="btn btn-secondary" style={{ marginLeft: 8, padding: "2px 8px", fontSize: 12 }} disabled={submitting} onClick={cancelDelegate}>Cancel</button>
                     )}
                   </div>
                 )
@@ -281,7 +306,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                     <option value="">{task.reviewerId ? "Hand off to…" : "Hand off to…"}</option>
                     {otherAdmins.map((m) => <option key={m.userId._id} value={m.userId._id}>{m.userId.name}</option>)}
                   </select>
-                  <button className="btn btn-secondary" onClick={sendDelegate}>Send</button>
+                  <button className="btn btn-secondary" disabled={submitting} onClick={sendDelegate}>Send</button>
                 </div>
               )}
             </div>
@@ -317,12 +342,12 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
           )}
 
           <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-            {isAssignee && task.status === "todo" && <button className="btn btn-primary" onClick={() => moveStatus("in_progress")}>Start task</button>}
-            {isAssignee && task.status === "in_progress" && <button className="btn btn-primary" onClick={() => moveStatus("pending_review")}>Submit for review</button>}
+            {isAssignee && task.status === "todo" && <button className="btn btn-primary" disabled={submitting} onClick={() => moveStatus("in_progress")}>Start task</button>}
+            {isAssignee && task.status === "in_progress" && <button className="btn btn-primary" disabled={submitting} onClick={() => moveStatus("pending_review")}>Submit for review</button>}
             {canManage && task.status === "pending_review" && (
               <>
-                <button className="btn btn-primary" onClick={() => moveStatus("done")}>Approve</button>
-                <button className="btn btn-secondary" style={{ color: "var(--color-accent-300)" }} onClick={() => setShowReject((s) => !s)}>Reject</button>
+                <button className="btn btn-primary" disabled={submitting} onClick={() => moveStatus("done")}>Approve</button>
+                <button className="btn btn-secondary" style={{ color: "var(--color-accent-300)" }} disabled={submitting} onClick={() => setShowReject((s) => !s)}>Reject</button>
               </>
             )}
             {canDelete && <button className="btn btn-secondary" style={{ color: "var(--color-accent-300)" }} onClick={() => setConfirmDelete(true)}>Delete task</button>}
@@ -331,7 +356,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
           {showReject && (
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <input className="input" placeholder="Reason for rejection" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
-              <button className="btn btn-primary" onClick={() => rejectReason && moveStatus("in_progress", rejectReason)}>Send</button>
+              <button className="btn btn-primary" disabled={submitting} onClick={() => rejectReason && moveStatus("in_progress", rejectReason)}>Send</button>
             </div>
           )}
         </div>
@@ -354,9 +379,9 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                       {sender?.userId.name ?? "—"} · {new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                     </div>
                     <div style={{ display: "flex", gap: 4, alignItems: "flex-end", flexDirection: mine ? "row-reverse" : "row" }}>
-                      <div style={{ padding: "9px 13px", borderRadius: 14, fontSize: 14, lineHeight: 1.4, background: mine ? "var(--color-accent)" : "var(--color-bg)", color: mine ? "var(--color-bg)" : "var(--color-text)" }}>
+                      <div style={{ padding: "9px 13px", borderRadius: 14, fontSize: 14, lineHeight: 1.4, background: mine ? "var(--color-accent)" : "var(--color-surface)", color: mine ? "var(--color-bg)" : "var(--color-text)" }}>
                         {m.replyTo && (
-                          <div style={{ borderLeft: "2px solid currentColor", background: "color-mix(in srgb, currentColor 14%, transparent)", borderRadius: 6, padding: "4px 8px", marginBottom: 6, fontSize: 12 }}>
+                          <div style={{ borderLeft: "2px solid currentColor", background: "color-mix(in srgb, currentColor 14%, transparent)", borderRadius: 6, padding: "4px 8px", marginBottom: 6, fontSize: 12.5 }}>
                             <div style={{ fontWeight: 600, opacity: 0.9 }}>{m.replyTo.senderName}</div>
                             <div style={{ opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{m.replyTo.text}</div>
                           </div>
@@ -388,7 +413,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-accent-300)" }}>{replyingTo.senderName}</div>
                 <div style={{ fontSize: 12, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
               </div>
-              <button onClick={() => setReplyingTo(null)} aria-label="Cancel reply" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
+              <button className="btn btn-icon" onClick={() => setReplyingTo(null)} aria-label="Cancel reply" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6 }}>×</button>
             </div>
           )}
           {chatCanWrite && (

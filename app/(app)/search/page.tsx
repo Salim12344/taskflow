@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { onKeyActivate } from "@/lib/a11y";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type TaskResult = { taskId: string; title: string; projectName: string; groupName: string };
 type MessageResult = { messageId: string; groupId: string; groupName: string; text: string; senderName: string; createdAt: string };
@@ -13,20 +14,25 @@ export default function SearchPage() {
   const [q, setQ] = useState("");
   const [tasks, setTasks] = useState<TaskResult[]>([]);
   const [messages, setMessages] = useState<MessageResult[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+
+  function runSearch() {
+    if (q.trim().length < 2) return;
+    api<{ tasks: TaskResult[]; messages: MessageResult[] }>(`/api/search?q=${encodeURIComponent(q.trim())}`)
+      .then((d) => { setTasks(d.tasks); setMessages(d.messages); setError(null); })
+      .catch((e) => setError(e));
+  }
 
   useEffect(() => {
     if (q.trim().length < 2) {
       setTasks([]);
       setMessages([]);
+      setError(null);
       return;
     }
-    const timeout = setTimeout(() => {
-      api<{ tasks: TaskResult[]; messages: MessageResult[] }>(`/api/search?q=${encodeURIComponent(q.trim())}`)
-        .then((d) => { setTasks(d.tasks); setMessages(d.messages); })
-        .catch((e) => setError(e.message));
-    }, 300);
+    const timeout = setTimeout(runSearch, 300);
     return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
   return (
@@ -40,7 +46,7 @@ export default function SearchPage() {
         onChange={(e) => setQ(e.target.value)}
         style={{ marginBottom: 24 }}
       />
-      {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
+      <ErrorBanner error={error} onRetry={runSearch} />
       {q.trim().length >= 2 && tasks.length === 0 && messages.length === 0 && (
         <div className="card-meta">No results for &ldquo;{q.trim()}&rdquo;.</div>
       )}

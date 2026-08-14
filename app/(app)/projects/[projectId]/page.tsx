@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { api } from "@/lib/api-client";
 import { statusColorVar } from "@/lib/status";
 import { onKeyActivate } from "@/lib/a11y";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type Project = { _id: string; name: string; description: string; groupId: string };
 type Task = { _id: string; title: string; status: string; assignedTo: string | null; deadline: string | null };
@@ -26,7 +27,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [members, setMembers] = useState<Member[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [mobileStatus, setMobileStatus] = useState("todo");
 
   function load() {
@@ -35,11 +36,11 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
         setProject(d.project);
         return api<{ members: Member[] }>(`/api/groups/${d.project.groupId}/members`);
       })
-      .then((d) => setMembers(d.members))
-      .catch((e) => setError(e.message));
+      .then((d) => { setMembers(d.members); setError(null); })
+      .catch((e) => setError(e));
     api<{ tasks: Task[] }>(`/api/projects/${projectId}/tasks`)
       .then((d) => setTasks(d.tasks))
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e));
   }
 
   useEffect(load, [projectId]);
@@ -57,7 +58,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
         {isAdmin && <button className="btn btn-primary" onClick={() => router.push(`/projects/${projectId}/new-task`)}>New task</button>}
       </div>
       <div style={{ fontSize: 13, color: "color-mix(in srgb, var(--color-text) 55%, transparent)", marginBottom: 16 }}>{project?.description}</div>
-      {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
+      <ErrorBanner error={error} onRetry={load} />
 
       <div className="kanban-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, flex: 1, minHeight: 0 }}>
         {COLUMNS.map((col) => {
@@ -79,6 +80,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
                     {t.deadline && <div className="card-meta"><span className="tag tag-outline">Due <span className="mono">{new Date(t.deadline).toLocaleDateString()}</span></span></div>}
                   </div>
                 ))}
+                {tasks && colTasks.length === 0 && <div className="card-meta">No tasks in this column.</div>}
               </div>
             </div>
           );

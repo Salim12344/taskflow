@@ -8,6 +8,7 @@ import { Avatar } from "@/components/Avatar";
 import { isOnline, formatLastSeen } from "@/lib/presence";
 import { formatChatListTimestamp } from "@/lib/format-time";
 import { onKeyActivate } from "@/lib/a11y";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type Thread = {
   threadId: string;
@@ -21,23 +22,25 @@ export default function MessagesInboxPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const [threads, setThreads] = useState<Thread[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+
+  function load() {
+    api<{ threads: Thread[] }>("/api/dm")
+      .then((d) => { setThreads(d.threads); setError(null); })
+      .catch((e) => setError(e));
+  }
 
   useEffect(() => {
-    function load() {
-      api<{ threads: Thread[] }>("/api/dm")
-        .then((d) => setThreads(d.threads))
-        .catch((e) => setError(e.message));
-    }
     load();
-    const interval = setInterval(load, 3000);
+    const interval = setInterval(load, 1500);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="tf-fade page-pad" style={{ padding: "32px 40px" }}>
       <h2 style={{ marginBottom: 20 }}>Messages</h2>
-      {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
+      <ErrorBanner error={error} onRetry={load} />
       {threads?.length === 0 && <div className="card-meta">No conversations yet — message someone from a group&rsquo;s Members list.</div>}
       <div style={{ borderRadius: 8, overflow: "hidden", background: "var(--color-surface)" }}>
         {threads?.map((t) => {

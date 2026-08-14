@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { statusColorVar } from "@/lib/status";
 import { onKeyActivate } from "@/lib/a11y";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type Section = {
   groupId: string;
@@ -24,9 +25,10 @@ export default function ReviewQueuePage() {
   const [status, setStatus] = useState("pending_review");
   const [byStatus, setByStatus] = useState<Record<string, Section[]>>({});
   const [mine, setMine] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
-  useEffect(() => {
+  function load() {
+    setError(null);
     Promise.all(
       STATUS_OPTIONS.map((o) =>
         api<{ sections: Section[]; mine: boolean }>(`/api/review-queue?status=${o.value}`).then((d) => [o.value, d] as const)
@@ -36,8 +38,10 @@ export default function ReviewQueuePage() {
         setByStatus(Object.fromEntries(entries.map(([k, d]) => [k, d.sections])));
         setMine(entries[0]?.[1].mine ?? false);
       })
-      .catch((e) => setError(e.message));
-  }, []);
+      .catch((e) => setError(e));
+  }
+
+  useEffect(load, []);
 
   const countFor = (s: string) => (byStatus[s] ?? []).reduce((sum, sec) => sum + sec.tasks.length, 0);
   const sections = byStatus[status];
@@ -74,7 +78,7 @@ export default function ReviewQueuePage() {
         })}
       </div>
 
-      {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13 }}>{error}</div>}
+      <ErrorBanner error={error} onRetry={load} />
       {sections?.length === 0 && <div className="card-meta">Nothing here.</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {sections?.map((s) => (

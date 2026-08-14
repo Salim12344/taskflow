@@ -12,6 +12,7 @@ import { isOnline, formatLastSeen } from "@/lib/presence";
 import { onKeyActivate } from "@/lib/a11y";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useStickToBottom } from "@/lib/use-stick-to-bottom";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 type Group = { _id: string; name: string };
 type Project = { _id: string; name: string; description: string; status: string };
@@ -57,7 +58,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
   const [activity, setActivity] = useState<ActivityEntry[] | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [composer, setComposer] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [showNewProject, setShowNewProject] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [seenByModal, setSeenByModal] = useState<ReadReceipt[] | null>(null);
@@ -86,20 +87,20 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
 
   function loadAll() {
     api<{ group: Group; showOnboarding: boolean }>(`/api/groups/${groupId}`)
-      .then((d) => { setGroup(d.group); setShowOnboarding(d.showOnboarding); })
-      .catch((e) => setError(e.message));
+      .then((d) => { setGroup(d.group); setShowOnboarding(d.showOnboarding); setError(null); })
+      .catch((e) => setError(e));
     api<{ projects: Project[] }>(`/api/groups/${groupId}/projects`)
       .then((d) => setProjects(d.projects))
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e));
     api<{ members: Member[] }>(`/api/groups/${groupId}/members`)
       .then((d) => setMembers(d.members))
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e));
   }
 
   function loadMessages() {
     api<{ messages: GroupMessage[]; typingUsers: { _id: string; name: string }[] }>(`/api/groups/${groupId}/messages`)
-      .then((d) => { setMessages(d.messages); setTypingUsers(d.typingUsers); })
-      .catch((e) => setError(e.message));
+      .then((d) => { setMessages(d.messages); setTypingUsers(d.typingUsers); setError(null); })
+      .catch((e) => setError(e));
   }
 
   useEffect(loadAll, [groupId]);
@@ -117,7 +118,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     if (tab !== "activity") return;
     api<{ entries: ActivityEntry[] }>(`/api/groups/${groupId}/activity`)
       .then((d) => setActivity(d.entries))
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e));
   }, [tab, groupId]);
 
   const me = members?.find((m) => m.userId._id === session?.user?.id);
@@ -135,7 +136,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
       setShowNewProject(false);
       loadAll();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
@@ -149,7 +150,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
       await api(`/api/groups/${groupId}/members/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) });
       loadAll();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
@@ -159,7 +160,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
       await api(`/api/groups/${groupId}/members/${m.userId._id}`, { method: "DELETE" });
       loadAll();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
@@ -169,7 +170,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
       await api(`/api/groups/${groupId}/leave`, { method: "POST" });
       router.push("/dashboard");
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
@@ -179,29 +180,33 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     const mentionIds = Object.entries(mentionMap)
       .filter(([name]) => text.includes(`@${name}`))
       .map(([, id]) => id);
+    const reply = replyingTo;
     setComposer("");
     setMentionMap({});
     setMentionQuery(null);
-    const replyToId = replyingTo?._id;
     setReplyingTo(null);
     try {
-      await api(`/api/groups/${groupId}/messages`, { method: "POST", body: JSON.stringify({ text, mentions: mentionIds, replyToId }) });
+      await api(`/api/groups/${groupId}/messages`, { method: "POST", body: JSON.stringify({ text, mentions: mentionIds, replyToId: reply?._id }) });
       loadMessages();
     } catch (e) {
-      setError((e as Error).message);
+      // Restore what was typed — losing a message to a network blip on top of the failure is worse than the failure itself.
+      setComposer(text);
+      setReplyingTo(reply);
+      setError(e);
     }
   }
 
   async function sendAttachment(file: Blob, filename: string) {
     setSendingAttachment(true);
-    const replyToId = replyingTo?._id;
+    const reply = replyingTo;
     setReplyingTo(null);
     try {
       const attachment = await uploadFile(file, filename);
-      await api(`/api/groups/${groupId}/messages`, { method: "POST", body: JSON.stringify({ text: "", attachments: [attachment], replyToId }) });
+      await api(`/api/groups/${groupId}/messages`, { method: "POST", body: JSON.stringify({ text: "", attachments: [attachment], replyToId: reply?._id }) });
       loadMessages();
     } catch (e) {
-      setError((e as Error).message);
+      setReplyingTo(reply);
+      setError(e);
     } finally {
       setSendingAttachment(false);
     }
@@ -249,7 +254,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
       });
       router.push(`/messages/${threadId}?from=group:${groupId}`);
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   }
 
@@ -273,7 +278,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
             {canLeave && <button className="btn btn-secondary" onClick={() => setConfirmLeave(true)}>Leave group</button>}
           </div>
         </div>
-        {error && <div style={{ color: "oklch(70% 0.15 25)", fontSize: 13, margin: "8px 0" }}>{error}</div>}
+        <ErrorBanner error={error} onRetry={tab === "chat" ? loadMessages : loadAll} style={{ margin: "8px 0" }} />
 
         {showOnboarding && (
           <div className="card elev-sm" style={{ margin: "12px 0" }}>
@@ -414,7 +419,7 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-accent-300)" }}>{replyingTo.senderName}</div>
                 <div style={{ fontSize: 12, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyingTo.text}</div>
               </div>
-              <button onClick={() => setReplyingTo(null)} aria-label="Cancel reply" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6, flex: "none" }}>×</button>
+              <button className="btn btn-icon" onClick={() => setReplyingTo(null)} aria-label="Cancel reply" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, opacity: 0.6 }}>×</button>
             </div>
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 10, position: "relative" }}>

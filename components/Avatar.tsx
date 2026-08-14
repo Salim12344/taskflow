@@ -10,10 +10,11 @@ function avatarHues(name: string) {
   return { a: `oklch(58% 0.13 ${hue})`, b: `oklch(38% 0.12 ${(hue + 40) % 360})` };
 }
 
-function OnlineDot({ size }: { size: number }) {
+function OnlineDot({ size, name }: { size: number; name: string }) {
   const dot = Math.max(8, Math.round(size * 0.28));
   return (
     <span
+      role="status"
       style={{
         position: "absolute",
         bottom: -1,
@@ -24,7 +25,11 @@ function OnlineDot({ size }: { size: number }) {
         background: "var(--color-green, #34d399)",
         border: "2px solid var(--color-surface)",
       }}
-    />
+    >
+      <span style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap", border: 0 }}>
+        {name} is online
+      </span>
+    </span>
   );
 }
 
@@ -54,7 +59,7 @@ export function Avatar({ name, avatarUrl, size = 32, fontSize, online = false }:
           {initialsOf(name) || "?"}
         </div>
       )}
-      {online && <OnlineDot size={size} />}
+      {online && <OnlineDot size={size} name={name} />}
     </div>
   );
 }
