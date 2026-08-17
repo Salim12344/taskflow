@@ -11,12 +11,14 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 type Org = { _id: string; name: string; regNumber: string; signupKey: string; groupCreators: { _id: string; name: string; email: string }[] };
 type Group = { _id: string; name: string };
 type PendingSignup = { _id: string; name: string; email: string; createdAt: string };
+type OrgMember = { _id: string; name: string; email: string; suspended: boolean; orgPermissions: string[] };
 
 export default function OrganizationPage() {
   const router = useRouter();
   const [org, setOrg] = useState<Org | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [pendingSignups, setPendingSignups] = useState<PendingSignup[]>([]);
+  const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [notOwner, setNotOwner] = useState(false);
@@ -24,8 +26,8 @@ export default function OrganizationPage() {
   const [regeneratingKey, setRegeneratingKey] = useState(false);
 
   function load() {
-    api<{ organization: Org; groups: Group[]; pendingSignups: PendingSignup[] }>("/api/organizations/mine")
-      .then((d) => { setOrg(d.organization); setGroups(d.groups); setPendingSignups(d.pendingSignups); setError(null); })
+    api<{ organization: Org; groups: Group[]; pendingSignups: PendingSignup[]; orgMembers: OrgMember[] }>("/api/organizations/mine")
+      .then((d) => { setOrg(d.organization); setGroups(d.groups); setPendingSignups(d.pendingSignups); setOrgMembers(d.orgMembers); setError(null); })
       .catch((e) => {
         if (e.message.includes("don't own")) setNotOwner(true);
         else setError(e);
@@ -130,6 +132,31 @@ export default function OrganizationPage() {
             </div>
           </div>
         )}
+
+        <div className="card elev-sm">
+          <div className="card-title">Org members ({orgMembers.length})</div>
+          <div className="card-body">Everyone who belongs to this org. Click a name to manage their groups, permissions, or suspend them.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {orgMembers.map((u) => (
+              <div
+                key={u._id}
+                role="button"
+                tabIndex={0}
+                className="row-hover"
+                onClick={() => router.push(`/organization/members/${u._id}`)}
+                onKeyDown={onKeyActivate(() => router.push(`/organization/members/${u._id}`))}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 4px", borderRadius: 8, cursor: "pointer" }}
+              >
+                <div>
+                  <div style={{ fontSize: 13.5 }}>{u.name}</div>
+                  <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{u.email}</div>
+                </div>
+                {u.suspended && <span className="tag tag-danger">Suspended</span>}
+              </div>
+            ))}
+            {orgMembers.length === 0 && <div className="card-meta">Nobody&rsquo;s joined yet.</div>}
+          </div>
+        </div>
 
         <div className="card elev-sm">
           <div className="card-title">Groups</div>

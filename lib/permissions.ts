@@ -3,6 +3,15 @@ import Group from "@/models/Group";
 import GroupMember from "@/models/GroupMember";
 import Task from "@/models/Task";
 import Organization from "@/models/Organization";
+import User from "@/models/User";
+
+/** Org-wide extras the owner granted this admin — always false for someone with no orgId set. */
+export async function hasOrgPermission(userId: string, orgId: string | null, permission: "view_all_tasks" | "org_override" | "approve_signups") {
+  if (!orgId) return false;
+  await connectDB();
+  const user = await User.findOne({ _id: userId, orgId }, "orgPermissions");
+  return !!user?.orgPermissions?.includes(permission);
+}
 
 /** A soft-deleted group's projects/tasks stop being reachable, not just hidden from lists — fetch through this, not Group.findById. */
 export async function getActiveGroup(groupId: string) {
@@ -114,6 +123,7 @@ export async function canManageTask(
   fallback: boolean
 ) {
   if (await isOrgOwnerOfGroup(orgId, userId)) return true;
+  if (await hasOrgPermission(userId, orgId, "org_override")) return true;
   if (!reviewerId) return fallback;
   return reviewerId === userId;
 }
