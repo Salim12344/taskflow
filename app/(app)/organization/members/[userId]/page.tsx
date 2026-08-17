@@ -20,6 +20,7 @@ const PERMISSIONS: { key: string; label: string; desc: string }[] = [
   { key: "view_all_tasks", label: "See all tasks in the org", desc: "Read access to every task across every group in the org, not just ones they admin." },
   { key: "org_override", label: "Org-owner-level override", desc: "Approve, reject, delete, or post in the chat of any task, org-wide — same emergency power you have. Doesn't extend to managing other admins." },
   { key: "approve_signups", label: "Approve new sign-ups", desc: "Can review and act on people requesting to join via the org's signup key." },
+  { key: "create_groups", label: "Create groups", desc: "Can spin up their own new group under this org and admin it — the \"head of department\" role. Doesn't require them to already be in any group." },
 ];
 
 export default function MemberProfilePage({ params }: { params: Promise<{ userId: string }> }) {
@@ -173,7 +174,7 @@ export default function MemberProfilePage({ params }: { params: Promise<{ userId
 
         <div className="card elev-sm">
           <div className="card-title">Extra abilities</div>
-          <div className="card-body">Org-wide, on top of whatever they already have as a group admin. Granted by you only.</div>
+          <div className="card-body">Org-wide extras, on top of whatever they already have per-group. Granted by you only.</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {PERMISSIONS.map((p) => (
               <label key={p.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--color-divider)", cursor: "pointer" }}>

@@ -16,9 +16,11 @@ const UserSchema = new Schema({
   // both block login everywhere; banning additionally blocks that email from rejoining this org.
   orgStatus: { type: String, enum: ["active", "suspended", "banned"], default: "active" },
   orgStatusReason: { type: String, default: null },
-  // Org-wide extras the owner can grant an admin, on top of their normal per-group admin rights.
-  // Exactly these three — no open-ended/custom permissions.
-  orgPermissions: [{ type: String, enum: ["view_all_tasks", "org_override", "approve_signups"] }],
+  // Org-wide extras the owner can grant, on top of whatever this person already has per-group.
+  // Exactly these four — no open-ended/custom permissions. create_groups doesn't require the
+  // person to admin (or even belong to) any group yet — it's "head of department" rights,
+  // letting them spin up their own group and become its admin from scratch.
+  orgPermissions: [{ type: String, enum: ["view_all_tasks", "org_override", "approve_signups", "create_groups"] }],
   lastActiveAt: { type: Date, default: null },
   showOnlineStatus: { type: Boolean, default: true }, // WhatsApp-style privacy toggle
   createdAt: { type: Date, default: Date.now },

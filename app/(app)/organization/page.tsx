@@ -6,9 +6,8 @@ import { api } from "@/lib/api-client";
 import { groupIcon } from "@/lib/group-icon";
 import { onKeyActivate } from "@/lib/a11y";
 import { ErrorBanner } from "@/components/ErrorBanner";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 
-type Org = { _id: string; name: string; regNumber: string; signupKey: string; groupCreators: { _id: string; name: string; email: string }[] };
+type Org = { _id: string; name: string; regNumber: string; signupKey: string };
 type Group = { _id: string; name: string };
 type PendingSignup = { _id: string; name: string; email: string; createdAt: string };
 type OrgMember = { _id: string; name: string; email: string; orgStatus: "active" | "suspended" | "banned"; orgPermissions: string[] };
@@ -27,10 +26,8 @@ export default function OrganizationPage() {
   const [pendingSignups, setPendingSignups] = useState<PendingSignup[]>([]);
   const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]["key"]>("all");
-  const [email, setEmail] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [notOwner, setNotOwner] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState<{ _id: string; name: string } | null>(null);
   const [regeneratingKey, setRegeneratingKey] = useState(false);
 
   function load() {
@@ -59,28 +56,6 @@ export default function OrganizationPage() {
   async function respondToSignup(userId: string, approve: boolean) {
     try {
       await api(`/api/organizations/mine/pending-signups/${userId}`, { method: "PATCH", body: JSON.stringify({ approve }) });
-      load();
-    } catch (e) {
-      setError(e);
-    }
-  }
-
-  async function addCreator(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      await api("/api/organizations/mine/creators", { method: "POST", body: JSON.stringify({ email }) });
-      setEmail("");
-      load();
-    } catch (e) {
-      setError(e);
-    }
-  }
-
-  async function removeCreator(userId: string) {
-    setConfirmRemove(null);
-    try {
-      await api(`/api/organizations/mine/creators/${userId}`, { method: "DELETE" });
       load();
     } catch (e) {
       setError(e);
@@ -174,8 +149,11 @@ export default function OrganizationPage() {
                   <div style={{ fontSize: 13.5 }}>{u.name}</div>
                   <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{u.email}</div>
                 </div>
-                {u.orgStatus === "suspended" && <span className="tag tag-danger">Suspended</span>}
-                {u.orgStatus === "banned" && <span className="tag tag-danger">Banned</span>}
+                <div style={{ display: "flex", gap: 6 }}>
+                  {u.orgPermissions.includes("create_groups") && <span className="tag tag-accent">Group creator</span>}
+                  {u.orgStatus === "suspended" && <span className="tag tag-danger">Suspended</span>}
+                  {u.orgStatus === "banned" && <span className="tag tag-danger">Banned</span>}
+                </div>
               </div>
             ))}
             {orgMembers.filter((u) => statusFilter === "all" || u.orgStatus === statusFilter).length === 0 && (
@@ -201,43 +179,7 @@ export default function OrganizationPage() {
             {groups.length === 0 && <div className="card-meta">No groups under this org yet.</div>}
           </div>
         </div>
-
-        <div className="card elev-sm">
-          <div className="card-title">Group creators</div>
-          <div className="card-body">
-            People with permission to create their own groups under this org and admin them — without owning the org itself. Good for department heads.
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {org?.groupCreators.map((u) => (
-              <div key={u._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--color-divider)" }}>
-                <div>
-                  <div style={{ fontSize: 13.5 }}>{u.name}</div>
-                  <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{u.email}</div>
-                </div>
-                <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12, color: "oklch(70% 0.15 25)" }} onClick={() => setConfirmRemove({ _id: u._id, name: u.name })}>
-                  Remove
-                </button>
-              </div>
-            ))}
-            {org?.groupCreators.length === 0 && <div className="card-meta">Nobody granted yet.</div>}
-          </div>
-          <form onSubmit={addCreator} style={{ display: "flex", gap: 8 }}>
-            <input className="input" type="email" required placeholder="person@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <button className="btn btn-primary" type="submit">Grant</button>
-          </form>
-        </div>
       </div>
-
-      {confirmRemove && (
-        <ConfirmDialog
-          title="Revoke group-creator permission?"
-          description={`${confirmRemove.name} will no longer be able to create groups under this org. Any groups they already created and admin stay untouched.`}
-          confirmLabel="Revoke"
-          danger
-          onConfirm={() => removeCreator(confirmRemove._id)}
-          onCancel={() => setConfirmRemove(null)}
-        />
-      )}
     </div>
   );
 }

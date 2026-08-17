@@ -11,7 +11,7 @@ import User from "@/models/User";
 import { notifyMany } from "@/lib/notify";
 import { hasAnotherAdmin } from "@/lib/permissions";
 
-const ORG_PERMISSIONS = ["view_all_tasks", "org_override", "approve_signups"];
+const ORG_PERMISSIONS = ["view_all_tasks", "org_override", "approve_signups", "create_groups"];
 
 async function orgGroupIds(orgId: string) {
   const groups = await Group.find({ orgId, deletedAt: null }, "_id name");
@@ -66,6 +66,17 @@ async function loadOrgOwned(session: { user: { id: string } }) {
   return Organization.findOne({ ownerId: session.user.id });
 }
 
+/** "Belongs to this org" covers key-joiners (orgId set) and anyone added to one of the org's
+ * groups the old way via invite link/email, who never had orgId touched at all. */
+async function loadOrgMember(org: { _id: mongoose.Types.ObjectId }, userId: string, projection?: string) {
+  const groups = await Group.find({ orgId: org._id, deletedAt: null }, "_id");
+  const groupIds = groups.map((g) => g._id.toString());
+  const isInAGroup = await GroupMember.exists({ groupId: { $in: groupIds }, userId });
+  const isKeyJoiner = await User.exists({ _id: userId, orgId: org._id, signupStatus: "approved" });
+  if (!isInAGroup && !isKeyJoiner) return null;
+  return User.findById(userId, projection);
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ userId: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -74,7 +85,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ userId:
   const org = await loadOrgOwned(session);
   if (!org) return NextResponse.json({ error: "You don't own an organization" }, { status: 404 });
 
-  const target = await User.findOne({ _id: userId, orgId: org._id }, "name email createdAt orgStatus orgStatusReason orgPermissions");
+  const target = await loadOrgMember(org, userId, "name email createdAt orgStatus orgStatusReason orgPermissions");
   if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const groups = await orgGroupIds(org._id.toString());
@@ -102,7 +113,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ userId
   const org = await loadOrgOwned(session);
   if (!org) return NextResponse.json({ error: "You don't own an organization" }, { status: 404 });
 
-  const target = await User.findOne({ _id: userId, orgId: org._id });
+  const target = await loadOrgMember(org, userId);
   if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if ("orgPermissions" in body) {
@@ -154,7 +165,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ user
   const org = await loadOrgOwned(session);
   if (!org) return NextResponse.json({ error: "You don't own an organization" }, { status: 404 });
 
-  const target = await User.findOne({ _id: userId, orgId: org._id });
+  const target = await loadOrgMember(org, userId);
   if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const groups = await orgGroupIds(org._id.toString());

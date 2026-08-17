@@ -32,14 +32,18 @@ export async function isGroupAdmin(groupId: string, userId: string, orgId: strin
 
 /**
  * The org (if any) this user is allowed to create new groups under — either because
- * they own it, or because the owner granted them "group creator" permission
+ * they own it, or because the owner granted them the "create_groups" org permission
  * (the "head of department" role: can create and admin their own group, nothing org-wide).
  */
 export async function getCreatableOrg(userId: string) {
   await connectDB();
   const owned = await Organization.findOne({ ownerId: userId });
   if (owned) return owned;
-  return Organization.findOne({ groupCreators: userId });
+  const user = await User.findById(userId, "orgId orgPermissions");
+  if (user?.orgId && user.orgPermissions?.includes("create_groups")) {
+    return Organization.findById(user.orgId);
+  }
+  return null;
 }
 
 /** Member either via groupMembers row, or as the (implicit-admin) owner of the group's org. */
