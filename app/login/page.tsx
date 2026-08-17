@@ -14,9 +14,9 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get("error") === "account-suspended" || searchParams.get("code") === "account-suspended") {
-      setError("This account has been suspended. Contact your org admin if you think this is a mistake.");
-    }
+    const code = searchParams.get("error") ?? searchParams.get("code");
+    if (code === "account-suspended") setError("This account has been suspended. Contact your org admin if you think this is a mistake.");
+    if (code === "account-banned") setError("This account has been banned.");
   }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -26,11 +26,9 @@ function LoginForm() {
     const res = await signIn("credentials", { email, password, redirect: false });
     setLoading(false);
     if (res?.error) {
-      setError(
-        res.code === "account-suspended"
-          ? "This account has been suspended. Contact your org admin if you think this is a mistake."
-          : "Invalid email or password"
-      );
+      if (res.code === "account-suspended") setError("This account has been suspended. Contact your org admin if you think this is a mistake.");
+      else if (res.code === "account-banned") setError("This account has been banned.");
+      else setError("Invalid email or password");
       return;
     }
     router.push("/dashboard");

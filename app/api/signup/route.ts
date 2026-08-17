@@ -47,6 +47,9 @@ export async function POST(request: NextRequest) {
     if (!joinOrg) {
       return NextResponse.json({ error: "Invalid organization key" }, { status: 400 });
     }
+    if (joinOrg.bannedEmails?.includes(email.toLowerCase())) {
+      return NextResponse.json({ error: "This email is banned from joining this organization" }, { status: 403 });
+    }
   }
 
   const passwordHash = await bcrypt.hash(password, 10);

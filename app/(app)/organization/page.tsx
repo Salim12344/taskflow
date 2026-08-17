@@ -11,7 +11,14 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 type Org = { _id: string; name: string; regNumber: string; signupKey: string; groupCreators: { _id: string; name: string; email: string }[] };
 type Group = { _id: string; name: string };
 type PendingSignup = { _id: string; name: string; email: string; createdAt: string };
-type OrgMember = { _id: string; name: string; email: string; suspended: boolean; orgPermissions: string[] };
+type OrgMember = { _id: string; name: string; email: string; orgStatus: "active" | "suspended" | "banned"; orgPermissions: string[] };
+
+const STATUS_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "suspended", label: "Suspended" },
+  { key: "banned", label: "Banned" },
+] as const;
 
 export default function OrganizationPage() {
   const router = useRouter();
@@ -19,6 +26,7 @@ export default function OrganizationPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [pendingSignups, setPendingSignups] = useState<PendingSignup[]>([]);
   const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
+  const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]["key"]>("all");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [notOwner, setNotOwner] = useState(false);
@@ -135,9 +143,24 @@ export default function OrganizationPage() {
 
         <div className="card elev-sm">
           <div className="card-title">Org members ({orgMembers.length})</div>
-          <div className="card-body">Everyone who belongs to this org. Click a name to manage their groups, permissions, or suspend them.</div>
+          <div className="card-body">Everyone who belongs to this org. Click a name to manage their groups, permissions, or suspend/ban them.</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+            {STATUS_FILTERS.map((f) => {
+              const count = f.key === "all" ? orgMembers.length : orgMembers.filter((u) => u.orgStatus === f.key).length;
+              return (
+                <button
+                  key={f.key}
+                  className={`tab-btn ${statusFilter === f.key ? "tab-active" : ""}`}
+                  style={{ border: "1px solid var(--color-divider)", borderRadius: 20, fontSize: 12 }}
+                  onClick={() => setStatusFilter(f.key)}
+                >
+                  {f.label} <span className="mono" style={{ opacity: 0.7 }}>({count})</span>
+                </button>
+              );
+            })}
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {orgMembers.map((u) => (
+            {orgMembers.filter((u) => statusFilter === "all" || u.orgStatus === statusFilter).map((u) => (
               <div
                 key={u._id}
                 role="button"
@@ -151,10 +174,13 @@ export default function OrganizationPage() {
                   <div style={{ fontSize: 13.5 }}>{u.name}</div>
                   <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{u.email}</div>
                 </div>
-                {u.suspended && <span className="tag tag-danger">Suspended</span>}
+                {u.orgStatus === "suspended" && <span className="tag tag-danger">Suspended</span>}
+                {u.orgStatus === "banned" && <span className="tag tag-danger">Banned</span>}
               </div>
             ))}
-            {orgMembers.length === 0 && <div className="card-meta">Nobody&rsquo;s joined yet.</div>}
+            {orgMembers.filter((u) => statusFilter === "all" || u.orgStatus === statusFilter).length === 0 && (
+              <div className="card-meta">Nobody here.</div>
+            )}
           </div>
         </div>
 

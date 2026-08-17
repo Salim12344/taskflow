@@ -19,6 +19,9 @@ const OrganizationSchema = new Schema({
   },
   // Individuals granted "head of department" style permission to create groups under this org.
   groupCreators: [{ type: Schema.Types.ObjectId, ref: "User" }],
+  // Emails banned from ever joining this org via the signup key again — kept independent of any
+  // particular User record so a ban still means something even if the account is later removed.
+  bannedEmails: [{ type: String, lowercase: true }],
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -17,7 +17,7 @@ export async function GET() {
   const pendingSignups = await User.find({ orgId: org._id, signupStatus: "pending" }, "name email createdAt");
   const orgMembers = await User.find(
     { orgId: org._id, signupStatus: "approved" },
-    "name email createdAt suspended orgPermissions"
+    "name email createdAt orgStatus orgPermissions"
   );
 
   return NextResponse.json({ organization: org, groups, pendingSignups, orgMembers });

@@ -9,6 +9,9 @@ import User from "@/models/User";
 class AccountSuspendedError extends CredentialsSignin {
   code = "account-suspended";
 }
+class AccountBannedError extends CredentialsSignin {
+  code = "account-banned";
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
@@ -29,7 +32,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
-        if (user.suspended) throw new AccountSuspendedError();
+        if (user.orgStatus === "banned") throw new AccountBannedError();
+        if (user.orgStatus === "suspended") throw new AccountSuspendedError();
 
         return {
           id: user._id.toString(),
@@ -56,7 +60,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           accountType: "individual",
         });
       }
-      if (existing.suspended) return "/login?error=account-suspended";
+      if (existing.orgStatus === "banned") return "/login?error=account-banned";
+      if (existing.orgStatus === "suspended") return "/login?error=account-suspended";
       user.id = existing._id.toString();
       return true;
     },
@@ -65,15 +70,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         const dbUser = await User.findById(user.id);
-        if (dbUser?.suspended) return null;
+        if (dbUser?.orgStatus !== "active") return null;
         token.accountType = dbUser?.accountType;
         token.signupStatus = dbUser?.signupStatus;
         token.orgId = dbUser?.orgId?.toString() ?? null;
       } else {
-        // Re-checked on every request (not just at sign-in) so a suspension takes effect
+        // Re-checked on every request (not just at sign-in) so a suspension/ban takes effect
         // immediately for anyone already holding a session, not just on their next login.
-        const current = await User.findById(token.id as string, "suspended");
-        if (current?.suspended) return null;
+        const current = await User.findById(token.id as string, "orgStatus");
+        if (current && current.orgStatus !== "active") return null;
       }
       return token;
     },

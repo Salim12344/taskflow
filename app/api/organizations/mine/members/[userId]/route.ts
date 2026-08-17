@@ -74,7 +74,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ userId:
   const org = await loadOrgOwned(session);
   if (!org) return NextResponse.json({ error: "You don't own an organization" }, { status: 404 });
 
-  const target = await User.findOne({ _id: userId, orgId: org._id }, "name email createdAt suspended suspendedReason orgPermissions");
+  const target = await User.findOne({ _id: userId, orgId: org._id }, "name email createdAt orgStatus orgStatusReason orgPermissions");
   if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const groups = await orgGroupIds(org._id.toString());
@@ -113,15 +113,29 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ userId
     target.orgPermissions = perms;
   }
 
-  if ("suspended" in body) {
-    if (typeof body.suspended !== "boolean") return NextResponse.json({ error: "suspended must be a boolean" }, { status: 400 });
-    target.suspended = body.suspended;
-    target.suspendedReason = body.suspended ? (body.reason ?? null) : null;
+  if ("orgStatus" in body) {
+    const status = body.orgStatus;
+    if (!["active", "suspended", "banned"].includes(status)) {
+      return NextResponse.json({ error: "Invalid orgStatus" }, { status: 400 });
+    }
+    const wasBlocked = target.orgStatus !== "active";
+    target.orgStatus = status;
+    target.orgStatusReason = status === "active" ? null : (body.reason ?? null);
 
-    if (body.suspended) {
-      // Suspension freezes the account but leaves group membership intact (unlike full org
-      // removal) — still, work stuck under a frozen account is as stranded as if they'd left,
-      // so unassign/reassign the same way.
+    // Ban blocks re-signup independent of this User record — keep the org's list authoritative,
+    // adding/removing the email as the status crosses in/out of "banned".
+    if (status === "banned" && !org.bannedEmails?.includes(target.email)) {
+      org.bannedEmails = [...(org.bannedEmails ?? []), target.email];
+      await org.save();
+    } else if (status !== "banned" && org.bannedEmails?.includes(target.email)) {
+      org.bannedEmails = org.bannedEmails.filter((e: string) => e !== target.email);
+      await org.save();
+    }
+
+    if (!wasBlocked && status !== "active") {
+      // Suspending or banning freezes the account but leaves group membership intact (unlike
+      // full org removal) — still, work stuck under a frozen account is as stranded as if
+      // they'd left, so unassign/reassign the same way.
       const groups = await orgGroupIds(org._id.toString());
       await unassignActiveTasksOrgWide(groups, userId);
       await clearDelegationsOrgWide(groups.map((g) => g._id.toString()), userId);

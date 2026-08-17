@@ -8,8 +8,9 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Group = { _id: string; name: string; role: "admin" | "member" };
+type OrgStatus = "active" | "suspended" | "banned";
 type Member = {
-  user: { _id: string; name: string; email: string; createdAt: string; suspended: boolean; suspendedReason: string | null; orgPermissions: string[] };
+  user: { _id: string; name: string; email: string; createdAt: string; orgStatus: OrgStatus; orgStatusReason: string | null; orgPermissions: string[] };
   groups: Group[];
   activeTaskCount: number;
   pendingApprovalCount: number;
@@ -26,7 +27,7 @@ export default function MemberProfilePage({ params }: { params: Promise<{ userId
   const router = useRouter();
   const [data, setData] = useState<Member | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [confirmAction, setConfirmAction] = useState<"suspend" | "unsuspend" | "remove" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"suspend" | "ban" | "reinstate" | "remove" | null>(null);
   const [busy, setBusy] = useState(false);
 
   function load() {
@@ -59,9 +60,10 @@ export default function MemberProfilePage({ params }: { params: Promise<{ userId
         router.push("/organization");
         return;
       }
+      const orgStatus = confirmAction === "reinstate" ? "active" : confirmAction === "suspend" ? "suspended" : "banned";
       await api(`/api/organizations/mine/members/${userId}`, {
         method: "PATCH",
-        body: JSON.stringify({ suspended: confirmAction === "suspend" }),
+        body: JSON.stringify({ orgStatus }),
       });
       load();
     } catch (e) {
@@ -96,12 +98,20 @@ export default function MemberProfilePage({ params }: { params: Promise<{ userId
     suspend: {
       title: "Suspend this account?",
       confirmLabel: "Suspend",
-      description: [`${user.name} won't be able to log in at all until you unsuspend them.`, ...warningLines()].join(" "),
+      description: [`${user.name} won't be able to log in at all until you reinstate them.`, ...warningLines()].join(" "),
     },
-    unsuspend: {
-      title: "Unsuspend this account?",
-      confirmLabel: "Unsuspend",
-      description: `${user.name} will be able to log in again immediately.`,
+    ban: {
+      title: "Ban this account?",
+      confirmLabel: "Ban",
+      description: [
+        `${user.name} won't be able to log in, and their email won't be able to rejoin this org via the signup key again until you unban them.`,
+        ...warningLines(),
+      ].join(" "),
+    },
+    reinstate: {
+      title: user.orgStatus === "banned" ? "Unban this account?" : "Unsuspend this account?",
+      confirmLabel: user.orgStatus === "banned" ? "Unban" : "Unsuspend",
+      description: `${user.name} will be able to log in again immediately${user.orgStatus === "banned" ? ", and their email can use the signup key again" : ""}.`,
     },
     remove: {
       title: "Remove from the organization?",
@@ -123,7 +133,11 @@ export default function MemberProfilePage({ params }: { params: Promise<{ userId
           <h2 style={{ marginBottom: 2 }}>{user.name}</h2>
           <div style={{ fontSize: 13, color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>{user.email}</div>
         </div>
-        {user.suspended && <span className="tag tag-danger">Suspended{user.suspendedReason ? `: ${user.suspendedReason}` : ""}</span>}
+        {user.orgStatus !== "active" && (
+          <span className="tag tag-danger">
+            {user.orgStatus === "banned" ? "Banned" : "Suspended"}{user.orgStatusReason ? `: ${user.orgStatusReason}` : ""}
+          </span>
+        )}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
@@ -181,9 +195,21 @@ export default function MemberProfilePage({ params }: { params: Promise<{ userId
         <div className="card elev-sm">
           <div className="card-title">Account actions</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <button className="btn btn-secondary" onClick={() => setConfirmAction(user.suspended ? "unsuspend" : "suspend")}>
-              {user.suspended ? "Unsuspend account" : "Suspend account"}
-            </button>
+            {user.orgStatus === "active" && (
+              <>
+                <button className="btn btn-secondary" onClick={() => setConfirmAction("suspend")}>Suspend account</button>
+                <button className="btn btn-secondary" style={{ color: "oklch(70% 0.15 25)" }} onClick={() => setConfirmAction("ban")}>Ban account</button>
+              </>
+            )}
+            {user.orgStatus === "suspended" && (
+              <>
+                <button className="btn btn-secondary" onClick={() => setConfirmAction("reinstate")}>Unsuspend account</button>
+                <button className="btn btn-secondary" style={{ color: "oklch(70% 0.15 25)" }} onClick={() => setConfirmAction("ban")}>Ban account</button>
+              </>
+            )}
+            {user.orgStatus === "banned" && (
+              <button className="btn btn-secondary" onClick={() => setConfirmAction("reinstate")}>Unban account</button>
+            )}
             <button className="btn btn-secondary" style={{ color: "oklch(70% 0.15 25)" }} onClick={() => setConfirmAction("remove")}>
               Remove from organization
             </button>
@@ -196,7 +222,7 @@ export default function MemberProfilePage({ params }: { params: Promise<{ userId
           title={confirmCopy.title}
           description={confirmCopy.description}
           confirmLabel={busy ? "Working…" : confirmCopy.confirmLabel}
-          danger={confirmAction !== "unsuspend"}
+          danger={confirmAction !== "reinstate"}
           onConfirm={runAction}
           onCancel={() => setConfirmAction(null)}
         />
