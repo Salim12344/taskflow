@@ -30,5 +30,8 @@ export async function GET() {
     "name email createdAt orgStatus orgPermissions"
   );
 
-  return NextResponse.json({ organization: org, groups, pendingSignups, orgMembers });
+  return NextResponse.json(
+    { organization: org, groups, pendingSignups, orgMembers },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
