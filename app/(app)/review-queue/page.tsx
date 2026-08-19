@@ -10,7 +10,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 type Section = {
   groupId: string;
   groupName: string;
-  tasks: { taskId: string; title: string; projectName: string; submittedAt: string | null }[];
+  tasks: { taskId: string; title: string; projectName: string; assignedTo: string | null; submittedAt: string | null }[];
 };
 
 const STATUS_OPTIONS = [
@@ -26,6 +26,7 @@ export default function ReviewQueuePage() {
   const [byStatus, setByStatus] = useState<Record<string, Section[]>>({});
   const [mine, setMine] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [assignmentFilter, setAssignmentFilter] = useState<"all" | "unassigned">("all");
 
   function load() {
     setError(null);
@@ -44,7 +45,12 @@ export default function ReviewQueuePage() {
   useEffect(load, []);
 
   const countFor = (s: string) => (byStatus[s] ?? []).reduce((sum, sec) => sum + sec.tasks.length, 0);
-  const sections = byStatus[status];
+  const rawSections = byStatus[status];
+  const unassignedCount = (rawSections ?? []).reduce((sum, sec) => sum + sec.tasks.filter((t) => !t.assignedTo).length, 0);
+  const sections =
+    assignmentFilter === "unassigned"
+      ? rawSections?.map((s) => ({ ...s, tasks: s.tasks.filter((t) => !t.assignedTo) })).filter((s) => s.tasks.length > 0)
+      : rawSections;
 
   return (
     <div className="tf-fade page-pad" style={{ padding: "32px 40px 40px", maxWidth: 1200 }}>
@@ -79,6 +85,16 @@ export default function ReviewQueuePage() {
       </div>
 
       <ErrorBanner error={error} onRetry={load} />
+
+      {unassignedCount > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <select className="input" style={{ width: "auto" }} value={assignmentFilter} onChange={(e) => setAssignmentFilter(e.target.value as "all" | "unassigned")}>
+            <option value="all">All tasks</option>
+            <option value="unassigned">Unassigned only ({unassignedCount})</option>
+          </select>
+        </div>
+      )}
+
       {sections?.length === 0 && <div className="card-meta">Nothing here.</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {sections?.map((s) => (
@@ -98,7 +114,10 @@ export default function ReviewQueuePage() {
                   className="row-hover"
                   style={{ display: "flex", justifyContent: "space-between", padding: "10px 12px", margin: "0 -12px", borderRadius: 8, borderBottom: "1px solid var(--color-divider)" }}
                 >
-                  <span style={{ fontSize: 13.5 }}>{t.title} <span style={{ opacity: 0.6 }}>· {t.projectName}</span></span>
+                  <span style={{ fontSize: 13.5, display: "flex", alignItems: "center", gap: 8 }}>
+                    {t.title} <span style={{ opacity: 0.6 }}>· {t.projectName}</span>
+                    {!t.assignedTo && <span className="tag tag-teal">Unassigned</span>}
+                  </span>
                   <span className="mono" style={{ fontSize: 11.5, opacity: 0.6 }}>{t.submittedAt ? new Date(t.submittedAt).toLocaleDateString() : ""}</span>
                 </div>
               ))}

@@ -25,12 +25,16 @@ async function unassignActiveTasks(groupId: string, userId: string) {
   await Task.updateMany({ _id: { $in: assignedTasks.map((t) => t._id) } }, { $set: { assignedTo: null } });
   const admins = await GroupMember.find({ groupId, role: "admin" });
   const removedUser = await User.findById(userId, "name");
-  await notifyMany(
-    admins.map((a) => a.userId.toString()),
-    "tasks_unassigned",
-    `${assignedTasks.length} task(s) unassigned from ${removedUser?.name ?? "a removed member"} — need reassigning`,
-    { payload: { groupId, unassignedFromUserId: userId, taskIds: assignedTasks.map((t) => t._id) } }
-  );
+  // One notification per task (not a single batched one) so each deep-links straight to the
+  // task that needs reassigning instead of dropping the admin somewhere generic.
+  for (const task of assignedTasks) {
+    await notifyMany(
+      admins.map((a) => a.userId.toString()),
+      "tasks_unassigned",
+      `"${task.title}" was unassigned from ${removedUser?.name ?? "a removed member"} — needs reassigning`,
+      { payload: { groupId, taskId: task._id, unassignedFromUserId: userId } }
+    );
+  }
   return assignedTasks.length;
 }
 

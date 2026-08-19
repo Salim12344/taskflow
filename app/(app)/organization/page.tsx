@@ -26,6 +26,8 @@ export default function OrganizationPage() {
   const [pendingSignups, setPendingSignups] = useState<PendingSignup[]>([]);
   const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]["key"]>("all");
+  const [memberPage, setMemberPage] = useState(0);
+  const MEMBERS_PER_PAGE = 10;
   const [error, setError] = useState<unknown>(null);
   const [notOwner, setNotOwner] = useState(false);
   const [regeneratingKey, setRegeneratingKey] = useState(false);
@@ -127,39 +129,58 @@ export default function OrganizationPage() {
                   key={f.key}
                   className={`tab-btn ${statusFilter === f.key ? "tab-active" : ""}`}
                   style={{ border: "1px solid var(--color-divider)", borderRadius: 20, fontSize: 12 }}
-                  onClick={() => setStatusFilter(f.key)}
+                  onClick={() => { setStatusFilter(f.key); setMemberPage(0); }}
                 >
                   {f.label} <span className="mono" style={{ opacity: 0.7 }}>({count})</span>
                 </button>
               );
             })}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {orgMembers.filter((u) => statusFilter === "all" || u.orgStatus === statusFilter).map((u) => (
-              <div
-                key={u._id}
-                role="button"
-                tabIndex={0}
-                className="row-hover"
-                onClick={() => router.push(`/organization/members/${u._id}`)}
-                onKeyDown={onKeyActivate(() => router.push(`/organization/members/${u._id}`))}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 4px", borderRadius: 8, cursor: "pointer" }}
-              >
-                <div>
-                  <div style={{ fontSize: 13.5 }}>{u.name}</div>
-                  <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{u.email}</div>
+          {(() => {
+            const filtered = orgMembers.filter((u) => statusFilter === "all" || u.orgStatus === statusFilter);
+            const pageCount = Math.max(1, Math.ceil(filtered.length / MEMBERS_PER_PAGE));
+            const page = Math.min(memberPage, pageCount - 1);
+            const pageItems = filtered.slice(page * MEMBERS_PER_PAGE, page * MEMBERS_PER_PAGE + MEMBERS_PER_PAGE);
+            return (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {pageItems.map((u) => (
+                    <div
+                      key={u._id}
+                      role="button"
+                      tabIndex={0}
+                      className="row-hover"
+                      onClick={() => router.push(`/organization/members/${u._id}`)}
+                      onKeyDown={onKeyActivate(() => router.push(`/organization/members/${u._id}`))}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 4px", borderRadius: 8, cursor: "pointer" }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 13.5 }}>{u.name}</div>
+                        <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{u.email}</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {u.orgPermissions.includes("create_groups") && <span className="tag tag-accent">Group creator</span>}
+                        {u.orgStatus === "suspended" && <span className="tag tag-danger">Suspended</span>}
+                        {u.orgStatus === "banned" && <span className="tag tag-danger">Banned</span>}
+                      </div>
+                    </div>
+                  ))}
+                  {filtered.length === 0 && <div className="card-meta">Nobody here.</div>}
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {u.orgPermissions.includes("create_groups") && <span className="tag tag-accent">Group creator</span>}
-                  {u.orgStatus === "suspended" && <span className="tag tag-danger">Suspended</span>}
-                  {u.orgStatus === "banned" && <span className="tag tag-danger">Banned</span>}
-                </div>
-              </div>
-            ))}
-            {orgMembers.filter((u) => statusFilter === "all" || u.orgStatus === statusFilter).length === 0 && (
-              <div className="card-meta">Nobody here.</div>
-            )}
-          </div>
+                {pageCount > 1 && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+                    <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12 }} disabled={page === 0} onClick={() => setMemberPage(page - 1)}>
+                      Prev
+                    </button>
+                    <span className="mono" style={{ fontSize: 11.5, opacity: 0.7 }}>Page {page + 1} of {pageCount}</span>
+                    <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12 }} disabled={page >= pageCount - 1} onClick={() => setMemberPage(page + 1)}>
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         <div className="card elev-sm">

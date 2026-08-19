@@ -59,6 +59,7 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
   const voice = useVoiceRecorder();
   const { containerRef: chatContainerRef, endRef: chatEndRef, onScroll: onChatScroll } = useStickToBottom(chatMessages);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -128,6 +129,18 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
       setError(e);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function reassign(newAssignee: string) {
+    setReassigning(true);
+    try {
+      await api(`/api/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ assignedTo: newAssignee || null }) });
+      load();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setReassigning(false);
     }
   }
 
@@ -265,7 +278,22 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
 
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 12, color: "color-mix(in srgb, var(--color-text) 60%, transparent)", marginBottom: 4 }}>Assignee</div>
-            <div style={{ fontSize: 14 }}>{nameFor(task.assignedTo)}</div>
+            {isAdmin && canManage ? (
+              <select
+                className="input"
+                style={{ width: "auto", fontSize: 13.5 }}
+                value={task.assignedTo ?? ""}
+                disabled={reassigning}
+                onChange={(e) => reassign(e.target.value)}
+              >
+                <option value="">Unassigned</option>
+                {members.filter((m) => m.role === "member").map((m) => (
+                  <option key={m.userId._id} value={m.userId._id}>{m.userId.name}</option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ fontSize: 14 }}>{nameFor(task.assignedTo)}</div>
+            )}
           </div>
           {task.deadline && (
             <div style={{ marginTop: 12 }}>

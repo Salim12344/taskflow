@@ -32,21 +32,19 @@ async function unassignActiveTasksOrgWide(groups: { _id: mongoose.Types.ObjectId
 
   await Task.updateMany({ _id: { $in: tasks.map((t) => t._id) } }, { $set: { assignedTo: null } });
 
-  // Notify each affected group's admins separately so "N unassigned, need reassigning" stays scoped to their group.
+  // One notification per task, scoped to that task's own group's admins, deep-linking straight
+  // to the task instead of a single batched "N unassigned" notice with nowhere specific to land.
   const projectToGroup = new Map((await Project.find({ _id: { $in: projectIds } }, "_id groupId")).map((p) => [p._id.toString(), p.groupId.toString()]));
-  const byGroup = new Map<string, number>();
-  for (const t of tasks) {
-    const gid = projectToGroup.get(t.projectId.toString());
-    if (gid) byGroup.set(gid, (byGroup.get(gid) ?? 0) + 1);
-  }
   const removedUser = await User.findById(userId, "name");
-  for (const [groupId, count] of byGroup) {
+  for (const task of tasks) {
+    const groupId = projectToGroup.get(task.projectId.toString());
+    if (!groupId) continue;
     const admins = await GroupMember.find({ groupId, role: "admin" });
     await notifyMany(
       admins.map((a) => a.userId.toString()),
       "tasks_unassigned",
-      `${count} task(s) unassigned from ${removedUser?.name ?? "a member"} — need reassigning`,
-      { payload: { groupId, unassignedFromUserId: userId } }
+      `"${task.title}" was unassigned from ${removedUser?.name ?? "a member"} — needs reassigning`,
+      { payload: { groupId, taskId: task._id, unassignedFromUserId: userId } }
     );
   }
   return tasks.length;
@@ -100,8 +98,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ userId:
   const projectIds = await orgProjectIds(groupIds);
   const activeTaskCount = await Task.countDocuments({ projectId: { $in: projectIds }, assignedTo: userId, deletedAt: null, status: { $ne: "done" } });
   const pendingApprovalCount = await Task.countDocuments({ projectId: { $in: projectIds }, reviewerId: userId, deletedAt: null, status: "pending_review" });
+  const completedTaskCount = await Task.countDocuments({ projectId: { $in: projectIds }, assignedTo: userId, deletedAt: null, status: "done" });
 
-  return NextResponse.json({ user: target, groups: groupInfo, activeTaskCount, pendingApprovalCount });
+  return NextResponse.json({ user: target, groups: groupInfo, activeTaskCount, pendingApprovalCount, completedTaskCount });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ userId: string }> }) {
@@ -120,6 +119,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ userId
     const perms = body.orgPermissions;
     if (!Array.isArray(perms) || !perms.every((p) => ORG_PERMISSIONS.includes(p))) {
       return NextResponse.json({ error: "Invalid orgPermissions" }, { status: 400 });
+    }
+    if (perms.length > 0) {
+      const groupIds = (await orgGroupIds(org._id.toString())).map((g) => g._id.toString());
+      const isAdminSomewhere = await GroupMember.exists({ groupId: { $in: groupIds }, userId, role: "admin" });
+      if (!isAdminSomewhere) {
+        return NextResponse.json({ error: "Extra abilities can only be granted to someone who admins a group" }, { status: 400 });
+      }
     }
     target.orgPermissions = perms;
   }

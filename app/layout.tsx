@@ -32,6 +32,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#141318",
+  // Tells modern browsers to actually resize the layout viewport (so 100dvh shrinks correctly)
+  // when the on-screen keyboard opens, instead of just visually panning the page up over it —
+  // that panning-without-resizing is what reads as "the keyboard pushes everything up".
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

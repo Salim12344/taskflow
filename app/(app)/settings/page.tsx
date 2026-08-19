@@ -74,6 +74,7 @@ export default function SettingsPage() {
     try {
       await api("/api/me", { method: "PATCH", body: JSON.stringify({ name, avatarUrl, showOnlineStatus }) });
       setSaved(true);
+      setTimeout(() => setSaved(false), 5000);
       window.dispatchEvent(new Event("taskflow:profile-changed"));
     } catch (e) {
       setError(e);

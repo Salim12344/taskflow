@@ -1,22 +1,30 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api-client";
+
+const AUTO_DISMISS_MS = 5000;
 
 /** Retry only makes sense for transient failures (network drop, server hiccup) — a permission
  * or validation error will just fail the same way again, so no retry button for those. */
 export function ErrorBanner({ error, onRetry, style }: { error: unknown; onRetry?: () => void; style?: React.CSSProperties }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(true);
+  const message = error instanceof Error ? error.message : error ? String(error) : "";
 
   // A rejection (e.g. "can't promote — they have active tasks") is often triggered from a row
   // far down a long list — without this, the only feedback is a banner above the fold that's
   // easy to miss entirely, which reads as "nothing happened" rather than an explained failure.
   useEffect(() => {
     if (!error) return;
+    setVisible(true);
     ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     ref.current?.focus();
-  }, [error]);
+    // Auto-fades so a stale error doesn't sit on screen forever — a retry button stays
+    // reachable long enough to notice (the interaction it enables isn't lost, just the banner).
+    const timer = setTimeout(() => setVisible(false), AUTO_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [message]);
 
-  if (!error) return null;
-  const message = error instanceof Error ? error.message : String(error);
+  if (!error || !visible) return null;
   const kind = error instanceof ApiError ? error.kind : "unknown";
   const canRetry = !!onRetry && kind !== "permission" && kind !== "validation";
 

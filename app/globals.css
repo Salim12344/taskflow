@@ -140,6 +140,11 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing:
 .status-solid .card-meta { color: color-mix(in srgb, var(--color-bg) 75%, transparent); }
 .status-solid .tag-outline { border-color: color-mix(in srgb, var(--color-bg) 45%, transparent); color: var(--color-bg); }
 .status-solid .tag-danger { background: color-mix(in srgb, var(--color-bg) 25%, transparent); color: var(--color-bg); }
+.status-solid .tag-teal { background: color-mix(in srgb, var(--color-bg) 25%, transparent); color: var(--color-bg); }
+
+/* Unassigned is its own signal, independent of the four status colors — teal isn't used by any
+   task status, so it can't be mistaken for one. */
+.tag-teal { background: var(--color-teal-bg); color: var(--color-teal); }
 
 .row-hover { transition: background .12s ease; cursor: pointer; }
 .row-hover:hover { background: color-mix(in srgb, var(--color-text) 5%, transparent); }

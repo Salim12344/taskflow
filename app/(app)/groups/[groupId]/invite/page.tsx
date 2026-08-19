@@ -23,6 +23,7 @@ export default function InvitePage({ params }: { params: Promise<{ groupId: stri
       await api(`/api/groups/${groupId}/invites`, { method: "POST", body: JSON.stringify({ type: "email", email }) });
       setSent(true);
       setEmail("");
+      setTimeout(() => setSent(false), 5000);
     } catch (e) {
       setError(e);
     }

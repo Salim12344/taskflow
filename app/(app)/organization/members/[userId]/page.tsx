@@ -14,6 +14,7 @@ type Member = {
   groups: Group[];
   activeTaskCount: number;
   pendingApprovalCount: number;
+  completedTaskCount: number;
 };
 
 const PERMISSIONS: { key: string; label: string; desc: string }[] = [
@@ -84,8 +85,9 @@ export default function MemberProfilePage({ params }: { params: Promise<{ userId
     );
   }
 
-  const { user, groups, activeTaskCount, pendingApprovalCount } = data;
+  const { user, groups, activeTaskCount, pendingApprovalCount, completedTaskCount } = data;
   const adminOfGroups = groups.filter((g) => g.role === "admin");
+  const isAdminAnywhere = adminOfGroups.length > 0;
 
   function warningLines() {
     const lines: string[] = [];
@@ -164,34 +166,33 @@ export default function MemberProfilePage({ params }: { params: Promise<{ userId
             ))}
             {groups.length === 0 && <div className="card-meta">Not in any group yet.</div>}
           </div>
-          {(activeTaskCount > 0 || pendingApprovalCount > 0) && (
-            <div className="card-meta" style={{ marginTop: 4 }}>
-              {activeTaskCount > 0 && <div>{activeTaskCount} active task(s) assigned to them.</div>}
-              {pendingApprovalCount > 0 && <div>{pendingApprovalCount} task(s) pending their approval.</div>}
-            </div>
-          )}
-        </div>
-
-        <div className="card elev-sm">
-          <div className="card-title">Extra abilities</div>
-          <div className="card-body">Org-wide extras, on top of whatever they already have per-group. Granted by you only.</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {PERMISSIONS.map((p) => (
-              <label key={p.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--color-divider)", cursor: "pointer" }}>
-                <div>
-                  <div style={{ fontSize: 13 }}>{p.label}</div>
-                  <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>{p.desc}</div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={user.orgPermissions.includes(p.key)}
-                  onChange={() => togglePermission(p.key)}
-                  style={{ width: "auto", accentColor: "var(--color-accent)", flex: "none", marginTop: 3 }}
-                />
-              </label>
-            ))}
+          <div className="card-meta" style={{ marginTop: 4 }}>
+            {completedTaskCount} task(s) done.
           </div>
         </div>
+
+        {isAdminAnywhere && (
+          <div className="card elev-sm">
+            <div className="card-title">Extra abilities</div>
+            <div className="card-body">Org-wide extras, on top of whatever they already have per-group. Granted by you only.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {PERMISSIONS.map((p) => (
+                <label key={p.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--color-divider)", cursor: "pointer" }}>
+                  <div>
+                    <div style={{ fontSize: 13 }}>{p.label}</div>
+                    <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 55%, transparent)" }}>{p.desc}</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={user.orgPermissions.includes(p.key)}
+                    onChange={() => togglePermission(p.key)}
+                    style={{ width: "auto", accentColor: "var(--color-accent)", flex: "none", marginTop: 3 }}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="card elev-sm">
           <div className="card-title">Account actions</div>

@@ -30,6 +30,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
   const [members, setMembers] = useState<Member[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [mobileStatus, setMobileStatus] = useState("todo");
+  const [assignmentFilter, setAssignmentFilter] = useState<"all" | "unassigned">("all");
 
   function load() {
     api<{ project: Project }>(`/api/projects/${projectId}`)
@@ -61,9 +62,18 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
       <div style={{ fontSize: 13, color: "color-mix(in srgb, var(--color-text) 55%, transparent)", marginBottom: 16 }}>{project?.description}</div>
       <ErrorBanner error={error} onRetry={load} />
 
+      {tasks && tasks.some((t) => !t.assignedTo) && (
+        <div style={{ marginBottom: 14 }}>
+          <select className="input" style={{ width: "auto" }} value={assignmentFilter} onChange={(e) => setAssignmentFilter(e.target.value as "all" | "unassigned")}>
+            <option value="all">All tasks</option>
+            <option value="unassigned">Unassigned only ({tasks.filter((t) => !t.assignedTo).length})</option>
+          </select>
+        </div>
+      )}
+
       <div className="kanban-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, flex: 1, minHeight: 0 }}>
         {COLUMNS.map((col) => {
-          const colTasks = tasks?.filter((t) => t.status === col.key) ?? [];
+          const colTasks = tasks?.filter((t) => t.status === col.key && (assignmentFilter === "all" || !t.assignedTo)) ?? [];
           return (
             <div key={col.key} style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
               <div>
@@ -77,7 +87,9 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
                 {colTasks.map((t) => (
                   <div key={t._id} role="button" tabIndex={0} className="card elev-sm kanban-card status-solid tf-card-in" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)} onKeyDown={onKeyActivate(() => router.push(`/tasks/${t._id}`))}>
                     <div className="card-title" style={{ fontSize: 14.5 }}>{t.title}</div>
-                    <div className="card-meta">{nameFor(t.assignedTo)}</div>
+                    <div className="card-meta">
+                      {t.assignedTo ? nameFor(t.assignedTo) : <span className="tag tag-teal">Unassigned</span>}
+                    </div>
                     {t.deadline && (
                       <div className="card-meta">
                         <span className={`tag ${isOverdue(t.deadline, t.status) ? "tag-danger" : "tag-outline"}`}>
@@ -102,10 +114,12 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
           ))}
         </select>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, overflowY: "auto" }}>
-          {(tasks?.filter((t) => t.status === mobileStatus) ?? []).map((t) => (
+          {(tasks?.filter((t) => t.status === mobileStatus && (assignmentFilter === "all" || !t.assignedTo)) ?? []).map((t) => (
             <div key={t._id} className="card elev-sm kanban-card status-solid tf-card-in" style={{ "--rail-color": statusColorVar(t.status) } as React.CSSProperties} onClick={() => router.push(`/tasks/${t._id}`)}>
               <div className="card-title" style={{ fontSize: 14.5 }}>{t.title}</div>
-              <div className="card-meta">{nameFor(t.assignedTo)}</div>
+              <div className="card-meta">
+                {t.assignedTo ? nameFor(t.assignedTo) : <span className="tag tag-teal">Unassigned</span>}
+              </div>
               {t.deadline && (
                 <div className="card-meta">
                   <span className={`tag ${isOverdue(t.deadline, t.status) ? "tag-danger" : "tag-outline"}`}>
@@ -115,7 +129,7 @@ export default function ProjectPage({ params }: { params: Promise<{ projectId: s
               )}
             </div>
           ))}
-          {tasks && tasks.filter((t) => t.status === mobileStatus).length === 0 && (
+          {tasks && tasks.filter((t) => t.status === mobileStatus && (assignmentFilter === "all" || !t.assignedTo)).length === 0 && (
             <div className="card-meta">Nothing here.</div>
           )}
         </div>
