@@ -153,6 +153,9 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
         background: "var(--color-surface)",
         borderRight: "1px solid var(--color-divider)",
         height: "100dvh",
+        // Animating width (not transform) is deliberate here: the collapse must actually
+        // reclaim/reflow the space for the main content flex sibling, which a transform
+        // can't do. Single element, infrequent toggle — not a scroll/list perf concern.
         transition: "width .15s ease",
       }}
     >

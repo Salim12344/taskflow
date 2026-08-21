@@ -5,14 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { api } from "@/lib/api-client";
-import { useViewportHeight } from "@/lib/use-viewport-height";
 import { SignupStatusGate } from "@/components/SignupStatusGate";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { status, data: session } = useSession();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const viewportHeight = useViewportHeight();
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
@@ -54,7 +52,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div style={{ display: "flex", height: viewportHeight ? `${viewportHeight}px` : "100dvh", width: "100%", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100dvh", width: "100%", overflow: "hidden" }}>
       <div className={`app-sidebar ${mobileOpen ? "open" : ""}`}>
         <Sidebar open={mobileOpen} onNavigate={() => setMobileOpen(false)} />
       </div>
