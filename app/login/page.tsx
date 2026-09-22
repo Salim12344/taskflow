@@ -51,9 +51,6 @@ function LoginForm() {
           {loading ? "Logging in…" : "Log in"}
         </button>
       </form>
-      <button className="btn btn-secondary btn-block" onClick={() => signIn("google", { callbackUrl: "/dashboard" })}>
-        Continue with Google
-      </button>
       <div className="card-meta">
         No account? <Link href="/signup" style={{ color: "var(--color-accent-300)" }}>Sign up</Link>
       </div>
