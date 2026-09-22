@@ -34,8 +34,17 @@ export default function OrganizationPage() {
   const [regeneratingKey, setRegeneratingKey] = useState(false);
 
   function load() {
-    api<{ organization: Org; groups: Group[]; pendingSignups: PendingSignup[]; orgMembers: OrgMember[] }>"/api/organizations/mine")
-      .then((d) => { setOrg(d.organization); setGroups(d.groups); setPendingSignups(d.pendingSignups); setOrgMembers(d.orgMembers); setRejectedSignups([]); setError(null); })
+    api<{ organization: Org; groups: Group[]; pendingSignups: PendingSignup[]; rejectedSignups: PendingSignup[]; orgMembers: OrgMember[] }>(
+      "/api/organizations/mine"
+    )
+      .then((d) => {
+        setOrg(d.organization);
+        setGroups(d.groups);
+        setPendingSignups(d.pendingSignups ?? []);
+        setRejectedSignups(d.rejectedSignups ?? []);
+        setOrgMembers(d.orgMembers);
+        setError(null);
+      })
       .catch((e) => {
         if (e.message.includes("don't own")) setNotOwner(true);
         else setError(e);
