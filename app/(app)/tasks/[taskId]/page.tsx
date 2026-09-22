@@ -236,14 +236,13 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
     }
   }
 
-  async function startVoicePress() {
-    if (!voice.recording) await voice.start();
-  }
-
-  async function endVoicePress() {
-    if (!voice.recording) return;
-    const blob = await voice.stop();
-    if (blob && blob.size > 0) await sendAttachment(blob, `voice-note.${blob.type.includes("mp4") ? "m4a" : "webm"}`);
+  async function toggleVoice() {
+    if (voice.isRecordingRef.current) {
+      const blob = await voice.stop();
+      if (blob && blob.size > 0) await sendAttachment(blob, `voice-note.${blob.type.includes("mp4") ? "m4a" : "webm"}`);
+    } else {
+      await voice.start();
+    }
   }
 
   function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -456,13 +455,24 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
               </button>
               <input
                 className="input"
-                placeholder={voice.recording ? "Recording…" : "Message…"}
+                placeholder={voice.recording ? "Recording… Tap mic to stop" : "Message…"}
                 value={composer}
                 disabled={voice.recording}
                 onChange={(e) => setComposer(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendChatMessage(); } }}
                 autoComplete="off"
               />
+              {voice.recording && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-icon"
+                  onClick={() => voice.cancel()}
+                  title="Cancel recording"
+                  aria-label="Cancel recording"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                </button>
+              )}
               {composer.trim() ? (
                 <button className="btn btn-primary btn-icon" type="button" onClick={sendChatMessage} aria-label="Send message">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2.5-7L3 11z" /></svg>
@@ -472,17 +482,16 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
                   type="button"
                   className="btn btn-icon"
                   disabled={sendingAttachment}
-                  onPointerDown={startVoicePress}
-                  onPointerUp={endVoicePress}
-                  onPointerLeave={endVoicePress}
-                  onPointerCancel={endVoicePress}
-                  onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); startVoicePress(); } }}
-                  onKeyUp={(e) => { if (e.key === "Enter" || e.key === " ") endVoicePress(); }}
-                  title="Hold to record a voice note"
-                  aria-label="Hold to record a voice note"
-                  style={{ background: voice.recording ? "oklch(60% 0.2 25)" : "var(--color-accent)", color: "var(--color-bg)", touchAction: "none" }}
+                  onClick={toggleVoice}
+                  title={voice.recording ? "Tap to stop and send voice note" : "Tap to record voice note"}
+                  aria-label={voice.recording ? "Stop recording voice note" : "Record voice note"}
+                  style={{ background: voice.recording ? "oklch(60% 0.2 25)" : "var(--color-accent)", color: "var(--color-bg)" }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg>
+                  {voice.recording ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" /></svg>
+                  )}
                 </button>
               )}
             </div>
