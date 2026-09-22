@@ -125,8 +125,9 @@ export default function MemberProfilePage({ params }: { params: Promise<{ userId
 
   return (
     <div className="tf-fade page-pad" style={{ padding: "24px 40px 40px", maxWidth: 800 }}>
-      <div role="link" tabIndex={0} onClick={() => router.push("/organization")} onKeyDown={onKeyActivate(() => router.push("/organization"))} className="back-link" style={{ marginBottom: 14, width: "fit-content" }}>
-        ← Organization
+      <div role="link" tabIndex={0} onClick={() => router.push("/organization")} onKeyDown={onKeyActivate(() => router.push("/organization"))} className="back-link" style={{ marginBottom: 14 }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Organization
       </div>
 
       <ErrorBanner error={error} onRetry={load} />

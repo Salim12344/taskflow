@@ -261,7 +261,8 @@ export default function GroupPage({ params }: { params: Promise<{ groupId: strin
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div className="tf-fade page-pad" style={{ padding: "24px 40px 0", flex: "none" }}>
         <div role="link" tabIndex={0} onClick={() => router.push("/dashboard")} onKeyDown={onKeyActivate(() => router.push("/dashboard"))} className="back-link" style={{ marginBottom: 14 }}>
-          ← Dashboard
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Dashboard
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2, flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

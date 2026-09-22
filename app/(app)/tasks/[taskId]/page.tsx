@@ -262,7 +262,8 @@ export default function TaskPage({ params }: { params: Promise<{ taskId: string 
   return (
     <div className="tf-fade page-pad" style={{ padding: "24px 40px 40px" }}>
       <div role="link" tabIndex={0} onClick={() => router.push(`/projects/${task.projectId}`)} onKeyDown={onKeyActivate(() => router.push(`/projects/${task.projectId}`))} className="back-link" style={{ marginBottom: 14 }}>
-        ← {project?.name ?? "Back"}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        {project?.name ?? "Back"}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
         <h3>{task.title}</h3>

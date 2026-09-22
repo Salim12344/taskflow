@@ -62,7 +62,8 @@ export default function LoginPage() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20 }}>
       <Link href="/" className="back-link" style={{ position: "absolute", top: 20, left: 20 }}>
-        ← Back to home
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back to home
       </Link>
       <Suspense fallback={<div className="card elev-sm" style={{ width: "min(360px, 90vw)" }}>Loading…</div>}>
         <LoginForm />

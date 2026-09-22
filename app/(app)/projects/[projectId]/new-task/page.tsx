@@ -52,8 +52,9 @@ export default function NewTaskPage({ params }: { params: Promise<{ projectId: s
 
   return (
     <div className="tf-fade page-pad" style={{ padding: "24px 40px 40px", minHeight: "100%", display: "flex", flexDirection: "column" }}>
-      <div role="link" tabIndex={0} onClick={() => router.push(`/projects/${projectId}`)} onKeyDown={onKeyActivate(() => router.push(`/projects/${projectId}`))} className="back-link" style={{ marginBottom: 18, width: "fit-content" }}>
-        ← {project?.name ?? "Back"}
+      <div role="link" tabIndex={0} onClick={() => router.push(`/projects/${projectId}`)} onKeyDown={onKeyActivate(() => router.push(`/projects/${projectId}`))} className="back-link" style={{ marginBottom: 18 }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        {project?.name ?? "Back"}
       </div>
       <h2 style={{ marginBottom: 18 }}>New task</h2>
       <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
