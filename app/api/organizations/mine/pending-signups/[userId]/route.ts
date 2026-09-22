@@ -10,8 +10,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ userId
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { userId } = await params;
-  const { approve } = await req.json();
-  if (typeof approve !== "boolean") return NextResponse.json({ error: "approve must be a boolean" }, { status: 400 });
+  const body = await req.json().catch(() => ({}));
+  // Backwards-compatible: accept { approve: boolean } or new { action: 'approve'|'reject'|'reopen' }
+  let action: "approve" | "reject" | "reopen" | null = null;
+  if (typeof body.action === "string") {
+    if (body.action === "approve" || body.action === "reject" || body.action === "reopen") action = body.action;
+  } else if (typeof body.approve === "boolean") {
+    action = body.approve ? "approve" : "reject";
+  }
+  if (!action) return NextResponse.json({ error: "action must be 'approve', 'reject', or 'reopen'" }, { status: 400 });
 
   await connectDB();
   let org = await Organization.findOne({ ownerId: session.user.id });
@@ -24,10 +31,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ userId
   }
   if (!org) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const target = await User.findOne({ _id: userId, orgId: org._id, signupStatus: "pending" });
-  if (!target) return NextResponse.json({ error: "No pending sign-up found for that user" }, { status: 404 });
+  const target = await User.findOne({ _id: userId, orgId: org._id });
+  if (!target) return NextResponse.json({ error: "No sign-up found for that user" }, { status: 404 });
 
-  target.signupStatus = approve ? "approved" : "rejected";
+  // Only allow changing status if the current state is sensible. Owners/admins can reopen or reject.
+  if (action === "approve") target.signupStatus = "approved";
+  else if (action === "reject") target.signupStatus = "rejected";
+  else if (action === "reopen") target.signupStatus = "pending";
   await target.save();
 
   return NextResponse.json({ ok: true });

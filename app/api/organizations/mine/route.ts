@@ -16,6 +16,7 @@ export async function GET() {
 
   const groups = await Group.find({ orgId: org._id, deletedAt: null });
   const pendingSignups = await User.find({ orgId: org._id, signupStatus: "pending" }, "name email createdAt");
+  const rejectedSignups = await User.find({ orgId: org._id, signupStatus: "rejected" }, "name email createdAt");
 
   // "Belongs to the org" isn't just people who joined via the signup key (orgId set) — it's
   // also everyone added to one of the org's groups the old way, via a group invite link/email,
@@ -31,7 +32,7 @@ export async function GET() {
   );
 
   return NextResponse.json(
-    { organization: org, groups, pendingSignups, orgMembers },
+    { organization: org, groups, pendingSignups, rejectedSignups, orgMembers },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

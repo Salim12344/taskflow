@@ -264,23 +264,26 @@ export function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () =>
             </span>
             <Link href="/messages" style={{ fontSize: 10.5, color: "var(--color-accent-300)", textDecoration: "none" }}>See all</Link>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 10px" }}>
-            {dms.length === 0 && (
-              <div style={{ fontSize: 11.5, padding: "4px 10px", color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>
-                Message a member from a group&rsquo;s Members list.
-              </div>
-            )}
-            {dms.slice(0, 3).map((d) => (
-              <NavRow
-                key={d.threadId}
-                href={`/messages/${d.threadId}`}
-                label={d.other?.name ?? "Unknown"}
-                active={pathname === `/messages/${d.threadId}`}
-                icon={<Avatar name={d.other?.name ?? "?"} avatarUrl={d.other?.avatarUrl} size={20} fontSize={9.5} online={isOnline(d.other?.lastActiveAt ?? null)} />}
-                trailing={unreadBadge(d.unread)}
-              />
-            ))}
-          </div>
+          {/* Only show the DM thread list when the user is in the messages area */}
+          {isMessagesActive ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 10px" }}>
+              {dms.length === 0 && (
+                <div style={{ fontSize: 11.5, padding: "4px 10px", color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>
+                  Message a member from a group&rsquo;s Members list.
+                </div>
+              )}
+              {dms.slice(0, 3).map((d) => (
+                <NavRow
+                  key={d.threadId}
+                  href={`/messages/${d.threadId}`}
+                  label={d.other?.name ?? "Unknown"}
+                  active={pathname === `/messages/${d.threadId}`}
+                  icon={<Avatar name={d.other?.name ?? "?"} avatarUrl={d.other?.avatarUrl} size={20} fontSize={9.5} online={isOnline(d.other?.lastActiveAt ?? null)} />}
+                  trailing={unreadBadge(d.unread)}
+                />
+              ))}
+            </div>
+          ) : null}
         </>
       )}
 

@@ -24,6 +24,7 @@ export default function OrganizationPage() {
   const [org, setOrg] = useState<Org | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [pendingSignups, setPendingSignups] = useState<PendingSignup[]>([]);
+  const [rejectedSignups, setRejectedSignups] = useState<PendingSignup[]>([]);
   const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]["key"]>("all");
   const [memberPage, setMemberPage] = useState(0);
@@ -33,8 +34,8 @@ export default function OrganizationPage() {
   const [regeneratingKey, setRegeneratingKey] = useState(false);
 
   function load() {
-    api<{ organization: Org; groups: Group[]; pendingSignups: PendingSignup[]; orgMembers: OrgMember[] }>("/api/organizations/mine")
-      .then((d) => { setOrg(d.organization); setGroups(d.groups); setPendingSignups(d.pendingSignups); setOrgMembers(d.orgMembers); setError(null); })
+    api<{ organization: Org; groups: Group[]; pendingSignups: PendingSignup[]; orgMembers: OrgMember[] }>"/api/organizations/mine")
+      .then((d) => { setOrg(d.organization); setGroups(d.groups); setPendingSignups(d.pendingSignups); setOrgMembers(d.orgMembers); setRejectedSignups([]); setError(null); })
       .catch((e) => {
         if (e.message.includes("don't own")) setNotOwner(true);
         else setError(e);
@@ -55,9 +56,9 @@ export default function OrganizationPage() {
     }
   }
 
-  async function respondToSignup(userId: string, approve: boolean) {
+  async function respondToSignup(userId: string, action: "approve" | "reject" | "reopen") {
     try {
-      await api(`/api/organizations/mine/pending-signups/${userId}`, { method: "PATCH", body: JSON.stringify({ approve }) });
+      await api(`/api/organizations/mine/pending-signups/${userId}`, { method: "PATCH", body: JSON.stringify({ action }) });
       load();
     } catch (e) {
       setError(e);
@@ -109,8 +110,28 @@ export default function OrganizationPage() {
                     <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{u.email}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn btn-primary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => respondToSignup(u._id, true)}>Approve</button>
-                    <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12, color: "oklch(70% 0.15 25)" }} onClick={() => respondToSignup(u._id, false)}>Decline</button>
+                    <button className="btn btn-primary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => respondToSignup(u._id, "approve")}>Approve</button>
+                    <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12, color: "oklch(70% 0.15 25)" }} onClick={() => respondToSignup(u._id, "reject")}>Decline</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Show rejected signups so they don't disappear — allow reopening */}
+        {rejectedSignups.length > 0 && (
+          <div className="card elev-sm">
+            <div className="card-title">Rejected sign-ups ({rejectedSignups.length})</div>
+            <div className="card-body">People who were previously rejected — you can reopen their request if needed.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {rejectedSignups.map((u) => (
+                <div key={u._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--color-divider)" }}>
+                  <div>
+                    <div style={{ fontSize: 13.5 }}>{u.name}</div>
+                    <div style={{ fontSize: 11.5, color: "color-mix(in srgb, var(--color-text) 50%, transparent)" }}>{u.email}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="btn btn-primary" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => respondToSignup(u._id, "reopen")}>Reopen</button>
                   </div>
                 </div>
               ))}
